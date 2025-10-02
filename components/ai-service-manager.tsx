@@ -232,12 +232,19 @@ export function AIServiceManager({ open, onOpenChange, onConfigChange }: AIServi
         <div className="space-y-6">
           {/* Current Status */}
           {currentConfig && (
-            <Card className="border-green-200 bg-green-50">
+            <Card className="border-primary/20 bg-primary/5 dark:bg-primary/10">
               <CardContent className="pt-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-green-600" />
-                    <span className="font-medium">Currently connected to {providers.find(p => p.value === currentConfig.provider)?.label}</span>
+                    <CheckCircle className="h-4 w-4 text-primary" />
+                    <span className="font-medium">
+                      Currently connected to{" "}
+                      {
+                        providers.find(
+                          (p) => p.value === currentConfig.provider
+                        )?.label
+                      }
+                    </span>
                   </div>
                   <Button variant="outline" size="sm" onClick={disconnect} className="cursor-pointer">
                     Disconnect
@@ -283,7 +290,12 @@ export function AIServiceManager({ open, onOpenChange, onConfigChange }: AIServi
                 {selectedProvider === "openai" && (
                   <p className="text-xs text-muted-foreground mt-1">
                     Get your API key from{" "}
-                    <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                    <a
+                      href="https://platform.openai.com/api-keys"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline"
+                    >
                       OpenAI platform
                     </a>
                   </p>
@@ -291,7 +303,12 @@ export function AIServiceManager({ open, onOpenChange, onConfigChange }: AIServi
                 {selectedProvider === "anthropic" && (
                   <p className="text-xs text-muted-foreground mt-1">
                     Get your API key from{" "}
-                    <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                    <a
+                      href="https://console.anthropic.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline"
+                    >
                       Anthropic console
                     </a>
                   </p>
@@ -299,7 +316,12 @@ export function AIServiceManager({ open, onOpenChange, onConfigChange }: AIServi
                 {selectedProvider === "groq" && (
                   <p className="text-xs text-muted-foreground mt-1">
                     Get your API key from{" "}
-                    <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                    <a
+                      href="https://console.groq.com/keys"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline"
+                    >
                       Groq console
                     </a>
                   </p>
@@ -307,7 +329,12 @@ export function AIServiceManager({ open, onOpenChange, onConfigChange }: AIServi
                 {selectedProvider === "gemini" && (
                   <p className="text-xs text-muted-foreground mt-1">
                     Get your API key from{" "}
-                    <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                    <a
+                      href="https://aistudio.google.com/app/apikey"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline"
+                    >
                       Google AI Studio
                     </a>
                   </p>
@@ -333,13 +360,23 @@ export function AIServiceManager({ open, onOpenChange, onConfigChange }: AIServi
 
           {/* Test Result */}
           {testResult && (
-            <Alert className={testResult.success ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}>
+            <Alert
+              className={
+                testResult.success
+                  ? "border-primary/20 bg-primary/5 dark:bg-primary/10"
+                  : "border-destructive/20 bg-destructive/5 dark:bg-destructive/10"
+              }
+            >
               {testResult.success ? (
-                <CheckCircle className="h-4 w-4 text-green-600" />
+                <CheckCircle className="h-4 w-4 text-primary" />
               ) : (
-                <AlertCircle className="h-4 w-4 text-red-600" />
+                <AlertCircle className="h-4 w-4 text-destructive" />
               )}
-              <AlertDescription className={testResult.success ? "text-green-800" : "text-red-800"}>
+              <AlertDescription
+                className={
+                  testResult.success ? "text-primary" : "text-destructive"
+                }
+              >
                 {testResult.message}
               </AlertDescription>
             </Alert>
@@ -353,7 +390,7 @@ export function AIServiceManager({ open, onOpenChange, onConfigChange }: AIServi
           )}
 
           {/* Info Card */}
-          <Card className="bg-blue-50 border-blue-200">
+          <Card className="bg-secondary/50 border-secondary">
             <CardContent className="pt-4">
               <div className="space-y-2 text-sm">
                 <p className="font-medium">How it works:</p>
