@@ -621,8 +621,8 @@ export function ExportDialog({ open, onOpenChange, products, selectedProducts, o
             </div>
 
             {/* Export Summary */}
-            <div className="bg-gray-50 p-3 rounded-lg">
-              <div className="text-sm text-gray-600">
+            <div className="bg-muted p-3 rounded-lg">
+              <div className="text-sm text-muted-foreground">
                 <div className="flex justify-between">
                   <span>Products to export:</span>
                   <span className="font-medium">{filteredProducts.length}</span>
@@ -743,7 +743,7 @@ export function ExportDialog({ open, onOpenChange, products, selectedProducts, o
                   </div>
                 </div>
                 {customRangeError && (
-                  <div className="text-xs text-red-500">
+                  <div className="text-xs text-destructive">
                     {customRangeError}
                   </div>
                 )}
@@ -752,7 +752,7 @@ export function ExportDialog({ open, onOpenChange, products, selectedProducts, o
 
             {isEditing ? (
               <div className="space-y-2">
-                <div className="text-sm text-amber-600 bg-amber-50 p-2 rounded border border-amber-200">
+                <div className="text-sm text-accent-foreground bg-accent/50 p-2 rounded border border-accent">
                   <strong>Warning:</strong> Once you save the changes, they will permanently update your product data and cannot be automatically reset.
                 </div>
                 <Textarea
@@ -798,7 +798,7 @@ export function ExportDialog({ open, onOpenChange, products, selectedProducts, o
             )}
 
             {isPreviewEdited && !isEditing && (
-              <div className="flex items-center gap-2 text-sm text-orange-600 bg-orange-50 p-2 rounded">
+              <div className="flex items-center gap-2 text-sm text-accent-foreground bg-accent/50 p-2 rounded">
                 <Settings className="h-4 w-4" />
                 <span>Preview has been edited. Export will use your changes.</span>
                 <Button
@@ -815,7 +815,7 @@ export function ExportDialog({ open, onOpenChange, products, selectedProducts, o
             )}
 
             {!onProductsUpdate && isEditing && (
-              <div className="flex items-center gap-2 text-sm text-amber-600 bg-amber-50 p-2 rounded">
+              <div className="flex items-center gap-2 text-sm text-accent-foreground bg-accent/50 p-2 rounded">
                 <Settings className="h-4 w-4" />
                 <span>Changes can only be exported, not saved back to products (no update handler provided).</span>
               </div>
