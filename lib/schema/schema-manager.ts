@@ -61,9 +61,16 @@ export class SchemaManager {
           },
           {
             id: "field_4",
-            name: "tags",
+            name: "domain",
+            type: "string" as const,
+            mapping: "domain",
+            required: false
+          },
+          {
+            id: "field_5",
+            name: "features",
             type: "array" as const,
-            mapping: "tags",
+            mapping: "features",
             required: false
           }
         ]
@@ -102,9 +109,16 @@ export class SchemaManager {
           },
           {
             id: "field_5",
-            name: "topics",
+            name: "feature_list",
             type: "array" as const,
-            mapping: "tags",
+            mapping: "features",
+            required: false
+          },
+          {
+            id: "field_6",
+            name: "domain",
+            type: "string" as const,
+            mapping: "domain",
             required: false
           }
         ]
@@ -150,9 +164,9 @@ export class SchemaManager {
           },
           {
             id: "field_6",
-            name: "categories",
-            type: "array" as const,
-            mapping: "categories",
+            name: "domain",
+            type: "string" as const,
+            mapping: "domain",
             required: false
           }
         ]
@@ -270,6 +284,7 @@ export class SchemaManager {
       { path: 'logoUrl', label: 'Logo URL', type: 'string' },
       { path: 'source', label: 'Source Platform', type: 'string' },
       { path: 'status', label: 'Status', type: 'string' },
+  { path: 'domain', label: 'Domain', type: 'string' },
       
       // Links
       { path: 'links.website', label: 'Website URL', type: 'string' },
@@ -289,18 +304,7 @@ export class SchemaManager {
       { path: 'metadata.sourceIcon', label: 'Source Icon', type: 'string' },
       
       // Arrays
-      { path: 'tags', label: 'Tags', type: 'array' },
-      { path: 'domains', label: 'Domains', type: 'array' },
-      { path: 'categories', label: 'Categories', type: 'array' },
       { path: 'features', label: 'Features', type: 'array' },
-      { path: 'pricing', label: 'Pricing', type: 'array' },
-      
-      // AI Enhanced
-      { path: 'aiEnhanced.summary', label: 'AI Summary', type: 'string' },
-      { path: 'aiEnhanced.highlights', label: 'AI Highlights', type: 'array' },
-      { path: 'aiEnhanced.suggestedTags', label: 'AI Suggested Tags', type: 'array' },
-      { path: 'aiEnhanced.suggestedDomains', label: 'AI Suggested Domains', type: 'array' },
-      { path: 'aiEnhanced.suggestedCategories', label: 'AI Suggested Categories', type: 'array' },
     ];
   }
 

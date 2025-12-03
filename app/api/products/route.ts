@@ -16,11 +16,10 @@ export async function GET() {
         id: product.id,
         name: product.name,
         description: product.aiEnhanced?.summary || product.description,
-        tags: product.aiEnhanced?.suggestedTags || product.tags,
+        domain: product.aiEnhanced?.suggestedDomain || product.domain,
         features: product.aiEnhanced?.highlights || product.features,
         source: product.source,
         links: product.links,
-        pricing: product.pricing,
         metadata: {
           rating: product.metadata.rating || product.metadata.stars,
           scrapedAt: product.metadata.scrapedAt,

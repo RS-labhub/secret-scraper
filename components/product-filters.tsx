@@ -10,7 +10,8 @@ import { Badge } from "@/components/ui/badge"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Filter, X, Search } from "lucide-react"
-import type { Product } from "@/types/product"
+import { DOMAINS } from "@/types/product"
+import type { Domain, Product } from "@/types/product"
 
 interface ProductFiltersProps {
   products: Product[]
@@ -23,18 +24,22 @@ export function ProductFilters({ products, onFilterChange, searchQuery, onSearch
   const [filters, setFilters] = useState({
     status: [] as Product["status"][],
     source: [] as Product["source"][],
-    pricing: [] as string[],
-    tags: [] as string[],
+    domain: [] as Domain[],
     aiEnhanced: null as boolean | null,
   })
 
   const [activeFilters, setActiveFilters] = useState<string[]>([])
 
   // Get unique values for filter options
-  const uniqueTags = [...new Set(products.flatMap((p) => p.tags))].slice(0, 20)
+  const uniqueDomains = Array.from(
+    new Set(
+      products
+        .map((p) => p.domain || p.aiEnhanced?.suggestedDomain)
+        .filter((domain): domain is Domain => Boolean(domain)),
+    ),
+  ) as Domain[]
   const uniqueSources = [...new Set(products.map((p) => p.source))]
   const uniqueStatuses = [...new Set(products.map((p) => p.status))]
-  const uniquePricing = [...new Set(products.map((p) => p.pricing?.type).filter(Boolean))]
 
   const applyFilters = () => {
     let filtered = products
@@ -46,8 +51,9 @@ export function ProductFilters({ products, onFilterChange, searchQuery, onSearch
         (product) =>
           product.name.toLowerCase().includes(query) ||
           product.description.toLowerCase().includes(query) ||
-          product.tags.some((tag) => tag.toLowerCase().includes(query)) ||
-          product.features.some((feature) => feature.toLowerCase().includes(query)),
+          product.features.some((feature) => feature.toLowerCase().includes(query)) ||
+          product.domain?.toLowerCase().includes(query) ||
+          product.metadata?.language?.toLowerCase().includes(query),
       )
     }
 
@@ -61,14 +67,9 @@ export function ProductFilters({ products, onFilterChange, searchQuery, onSearch
       filtered = filtered.filter((product) => filters.source.includes(product.source))
     }
 
-    // Pricing filter
-    if (filters.pricing.length > 0) {
-      filtered = filtered.filter((product) => product.pricing && filters.pricing.includes(product.pricing.type))
-    }
-
-    // Tags filter
-    if (filters.tags.length > 0) {
-      filtered = filtered.filter((product) => filters.tags.some((tag) => product.tags.includes(tag)))
+    // Domain filter
+    if (filters.domain.length > 0) {
+      filtered = filtered.filter((product) => product.domain && filters.domain.includes(product.domain))
     }
 
     // AI Enhanced filter
@@ -100,8 +101,7 @@ export function ProductFilters({ products, onFilterChange, searchQuery, onSearch
     const active: string[] = []
     if (newFilters.status.length > 0) active.push(`Status: ${newFilters.status.join(", ")}`)
     if (newFilters.source.length > 0) active.push(`Source: ${newFilters.source.join(", ")}`)
-    if (newFilters.pricing.length > 0) active.push(`Pricing: ${newFilters.pricing.join(", ")}`)
-    if (newFilters.tags.length > 0) active.push(`Tags: ${newFilters.tags.slice(0, 3).join(", ")}`)
+    if (newFilters.domain.length > 0) active.push(`Domain: ${newFilters.domain.join(", ")}`)
     if (newFilters.aiEnhanced !== null) active.push(`AI Enhanced: ${newFilters.aiEnhanced ? "Yes" : "No"}`)
 
     setActiveFilters(active)
@@ -112,8 +112,7 @@ export function ProductFilters({ products, onFilterChange, searchQuery, onSearch
     setFilters({
       status: [],
       source: [],
-      pricing: [],
-      tags: [],
+      domain: [],
       aiEnhanced: null,
     })
     setActiveFilters([])
@@ -201,6 +200,25 @@ export function ProductFilters({ products, onFilterChange, searchQuery, onSearch
                 </div>
               </div>
 
+              {/* Domain Filter */}
+              <div className="space-y-2">
+                <Label className="text-sm">Domain</Label>
+                <div className="space-y-2 max-h-32 overflow-y-auto pr-2">
+                  {(uniqueDomains.length > 0 ? uniqueDomains : DOMAINS).map((domain) => (
+                    <div key={domain} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`domain-${domain}`}
+                        checked={filters.domain.includes(domain as Domain)}
+                        onCheckedChange={(checked) => updateFilter("domain", domain, checked ? "add" : "remove")}
+                      />
+                      <Label htmlFor={`domain-${domain}`} className="text-sm">
+                        {domain}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               {/* AI Enhanced Filter */}
               <div className="space-y-2">
                 <Label className="text-sm">AI Enhanced</Label>
@@ -228,22 +246,6 @@ export function ProductFilters({ products, onFilterChange, searchQuery, onSearch
                 </div>
               </div>
 
-              {/* Popular Tags */}
-              <div className="space-y-2">
-                <Label className="text-sm">Popular Tags</Label>
-                <div className="flex flex-wrap gap-1">
-                  {uniqueTags.slice(0, 10).map((tag) => (
-                    <Badge
-                      key={tag}
-                      variant={filters.tags.includes(tag) ? "default" : "outline"}
-                      className="cursor-pointer text-xs"
-                      onClick={() => updateFilter("tags", tag, filters.tags.includes(tag) ? "remove" : "add")}
-                    >
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
             </div>
           </PopoverContent>
         </Popover>

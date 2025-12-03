@@ -30,7 +30,6 @@ interface ExportDialogProps {
 export function ExportDialog({ open, onOpenChange, products, selectedProducts, onProductsUpdate }: ExportDialogProps) {
   const [format, setFormat] = useState<"json" | "csv" | "xml" | "markdown">("json")
   const [includeMetadata, setIncludeMetadata] = useState(true)
-  const [includeAiEnhancements, setIncludeAiEnhancements] = useState(true)
   const [useSelectedOnly, setUseSelectedOnly] = useState(false)
   const [approvedOnly, setApprovedOnly] = useState(true)
   const [dateRange, setDateRange] = useState<{ start?: Date; end?: Date }>({})
@@ -153,7 +152,6 @@ export function ExportDialog({ open, onOpenChange, products, selectedProducts, o
       const options = {
         format,
         includeMetadata,
-        includeAiEnhancements,
         ...(dateRange.start || dateRange.end ? { dateRange } : {}),
       }
 
@@ -234,7 +232,6 @@ export function ExportDialog({ open, onOpenChange, products, selectedProducts, o
     const options = {
       format,
       includeMetadata,
-      includeAiEnhancements,
       ...(dateRange.start || dateRange.end ? { dateRange } : {}),
     }
 
@@ -291,7 +288,7 @@ export function ExportDialog({ open, onOpenChange, products, selectedProducts, o
   // Update preview when dependencies change
   useEffect(() => {
     updatePreview()
-  }, [format, includeMetadata, includeAiEnhancements, dateRange, previewLimit, previewMode, customRange, filteredProducts, useCustomSchema, selectedSchema])
+  }, [format, includeMetadata, dateRange, previewLimit, previewMode, customRange, filteredProducts, useCustomSchema, selectedSchema])
 
   // Handle export with edited content if user made changes
   const handleExportWithPreview = async () => {
@@ -384,21 +381,6 @@ export function ExportDialog({ open, onOpenChange, products, selectedProducts, o
       // Update the products
       const allProducts = [...products]
       const productMap = new Map(allProducts.map(p => [p.id, p]))
-      const updatedProductIds = new Set(updatedProducts.map(p => p.id))
-
-      // Mark products that were in filteredProducts but not in updatedProducts as unapproved
-      filteredProducts.forEach(filteredProduct => {
-        if (!updatedProductIds.has(filteredProduct.id)) {
-          const index = allProducts.findIndex(p => p.id === filteredProduct.id)
-          if (index !== -1) {
-            allProducts[index] = { 
-              ...allProducts[index], 
-              status: "unapproved",
-              updatedAt: new Date().toISOString() 
-            }
-          }
-        }
-      })
 
       updatedProducts.forEach(updatedProduct => {
         if (updatedProduct.id && productMap.has(updatedProduct.id)) {
@@ -587,17 +569,6 @@ export function ExportDialog({ open, onOpenChange, products, selectedProducts, o
 
               <div className="flex items-center space-x-2">
                 <Checkbox
-                  id="ai-enhancements"
-                  checked={includeAiEnhancements}
-                  onCheckedChange={(checked) => setIncludeAiEnhancements(!!checked)}
-                />
-                <Label htmlFor="ai-enhancements" className="text-sm">
-                  Include AI enhancements
-                </Label>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Checkbox
                   id="approved-only"
                   checked={approvedOnly}
                   onCheckedChange={(checked) => setApprovedOnly(!!checked)}
@@ -719,7 +690,6 @@ export function ExportDialog({ open, onOpenChange, products, selectedProducts, o
                     className="h-8"
                   >
                     <Edit className="h-3 w-3 mr-1" />
-                    Edit
                   </Button>
                 )}
                 <Label htmlFor="preview-mode" className="text-xs">Show:</Label>

@@ -9,14 +9,14 @@ import { ScrapeDialog } from "@/components/scrape-dialog"
 import { ProductCard } from "@/components/product-card"
 import { AIServiceManager } from "@/components/ai-service-manager"
 import { CMSConfigDialog } from "@/components/cms-config-dialog"
-import { PublishDialog } from "@/components/publish-dialog"
+// import { PublishDialog } from "@/components/publish-dialog"
 import { ExportDialog } from "@/components/export-dialog"
 import { BulkAIEnhancementDialog } from "@/components/bulk-ai-enhancement-dialog"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { ActionLogger, logAction } from "@/components/action-logger"
 import { Footer } from "@/components/footer"
 import { loadFromStorage, saveToStorage, storage } from "@/lib/storage"
-import type { Product, ScrapeResult } from "@/types/product"
+import type { Product, ScrapeResult, Domain } from "@/types/product"
 import { Analytics } from "@vercel/analytics/react"
 
 export default function HomePage() {
@@ -24,7 +24,6 @@ export default function HomePage() {
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedDomains, setSelectedDomains] = useState<string[]>([])
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   const [cmsConfig, setCmsConfig] = useState<{ provider: string; config: any } | null>(null)
   const [showExportDialog, setShowExportDialog] = useState(false)
   const [showBulkAIDialog, setShowBulkAIDialog] = useState(false)
@@ -64,10 +63,12 @@ export default function HomePage() {
     saveToStorage("cmsConfig", cmsConfig)
   }, [cmsConfig])
 
-  // Available domains and categories - memoized
-  const availableDomains = useMemo(() => [...new Set(allProducts.flatMap((p) => p.domains))], [allProducts])
-
-  const availableCategories = useMemo(() => [...new Set(allProducts.flatMap((p) => p.categories))], [allProducts])
+  // Available domains - memoized
+  const availableDomains = useMemo(
+    () =>
+      [...new Set(allProducts.map((p) => p.domain).filter((domain): domain is Domain => Boolean(domain)))],
+    [allProducts]
+  )
 
   // Add source filter state
   const [selectedSource, setSelectedSource] = useState<"all" | "github" | "producthunt">("all")
@@ -81,21 +82,12 @@ export default function HomePage() {
       filtered = filtered.filter(
         (product) =>
           product.name.toLowerCase().includes(lowerQuery) ||
-          product.description.toLowerCase().includes(lowerQuery) ||
-          product.tags.some((tag) => tag.toLowerCase().includes(lowerQuery)),
+          product.description.toLowerCase().includes(lowerQuery),
       )
     }
 
     if (selectedDomains.length > 0) {
-      filtered = filtered.filter((product) =>
-        product.domains && selectedDomains.some((domain) => product.domains.includes(domain as any))
-      )
-    }
-
-    if (selectedCategories.length > 0) {
-      filtered = filtered.filter((product) =>
-        product.categories && selectedCategories.some((category) => product.categories.includes(category as any)),
-      )
+      filtered = filtered.filter((product) => product.domain && selectedDomains.includes(product.domain))
     }
 
     // Filter by source
@@ -104,7 +96,7 @@ export default function HomePage() {
     }
 
     setFilteredProducts(filtered)
-  }, [allProducts, searchQuery, selectedDomains, selectedCategories, selectedSource])
+  }, [allProducts, searchQuery, selectedDomains, selectedSource])
 
   // Handlers with useCallback to prevent unnecessary re-renders
   const handleScrapeComplete = useCallback((products: Product[]) => {
@@ -181,12 +173,6 @@ export default function HomePage() {
   }, [])
 
   // Toggle category selection
-  const toggleCategory = useCallback((category: string) => {
-    setSelectedCategories((prev) =>
-      prev.includes(category) ? prev.filter((c) => c !== category) : [...prev, category],
-    )
-  }, [])
-
   return (
     <>
       <div className="min-h-screen bg-background">
@@ -286,26 +272,6 @@ export default function HomePage() {
               </div>
             )}
 
-            {availableCategories.length > 0 && (
-              <div className="bg-card rounded-lg p-4 border border-border">
-                <div className="flex items-center gap-2 mb-3">
-                  <Filter className="w-4 h-4 text-muted-foreground" />
-                  <p className="text-sm font-medium text-foreground font-mono">Categories</p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {availableCategories.map((category) => (
-                    <Badge
-                      key={category}
-                      variant={selectedCategories.includes(category) ? "secondary" : "outline"}
-                      className="cursor-pointer hover:bg-secondary/10 transition-colors font-mono text-xs"
-                      onClick={() => toggleCategory(category)}
-                    >
-                      {category}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
 
           {allProducts.length > 0 && (
@@ -329,7 +295,7 @@ export default function HomePage() {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <PublishDialog products={allProducts} cmsConfig={cmsConfig as any} onPublishComplete={() => logAction("success", "Products published successfully")} />
+                {/* <PublishDialog products={allProducts} cmsConfig={cmsConfig as any} onPublishComplete={() => logAction("success", "Products published successfully")} /> */}
                 <Button variant="outline" size="sm" onClick={() => setShowBulkAIDialog(true)} className="cursor-pointer gap-2">
                   <Sparkles className="w-4 h-4" />
                   Bulk AI Enhance

@@ -22,7 +22,6 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Plus, Loader2, Search, Clock, TrendingUp, Key } from "lucide-react"
-import { DOMAINS, CATEGORIES } from "@/types/product"
 import type { Product, ScrapeRequest } from "@/types/product"
 import { logAction } from "@/components/action-logger"
 import { storage } from "@/lib/storage"
@@ -43,8 +42,6 @@ export function ScrapeDialog({ onScrapeComplete }: ScrapeDialogProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [source, setSource] = useState<"github" | "producthunt">("github")
   const [timePeriod, setTimePeriod] = useState<"daily" | "weekly" | "monthly">("daily")
-  const [selectedDomains, setSelectedDomains] = useState<string[]>([])
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   const [techStack, setTechStack] = useState<string[]>([])
   const [query, setQuery] = useState("")
   const [maxLimit, setMaxLimit] = useState(20)
@@ -83,8 +80,6 @@ export function ScrapeDialog({ onScrapeComplete }: ScrapeDialogProps) {
       const scrapeRequest: ScrapeRequest = {
         source,
         filters: {
-          domain: selectedDomains as any,
-          category: selectedCategories as any,
           timePeriod,
           query: query || undefined,
           techStack: techStack.length > 0 ? techStack : undefined,
@@ -126,8 +121,6 @@ export function ScrapeDialog({ onScrapeComplete }: ScrapeDialogProps) {
       logAction("success", `Found ${result.products.length} products from ${source}`)
       onScrapeComplete(result.products)
       setOpen(false)
-      setSelectedDomains([])
-      setSelectedCategories([])
       setTechStack([])
       setQuery("")
       setMaxLimit(20)
@@ -148,18 +141,6 @@ export function ScrapeDialog({ onScrapeComplete }: ScrapeDialogProps) {
     } finally {
       setIsLoading(false)
     }
-  }
-
-  const toggleDomain = (domain: string) => {
-    setSelectedDomains((prev) =>
-      prev.includes(domain) ? prev.filter((d) => d !== domain) : [...prev, domain]
-    )
-  }
-
-  const toggleCategory = (category: string) => {
-    setSelectedCategories((prev) =>
-      prev.includes(category) ? prev.filter((c) => c !== category) : [...prev, category]
-    )
   }
 
   const addTechStack = (tech: string) => {
@@ -503,43 +484,6 @@ export function ScrapeDialog({ onScrapeComplete }: ScrapeDialogProps) {
             </div>
           )}
 
-          {/* Domain Filters - GitHub only */}
-          {source === "github" && (
-            <div className="space-y-2">
-              <Label>Filter by Domains (Optional)</Label>
-              <div className="flex flex-wrap gap-2">
-                {DOMAINS.map((domain) => (
-                  <Badge
-                    key={domain}
-                    variant={selectedDomains.includes(domain) ? "default" : "outline"}
-                    className="cursor-pointer"
-                    onClick={() => toggleDomain(domain)}
-                  >
-                    {domain}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Category Filters - GitHub only */}
-          {source === "github" && (
-            <div className="space-y-2">
-              <Label>Filter by Categories (Optional)</Label>
-              <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
-                {CATEGORIES.map((category) => (
-                  <Badge
-                    key={category}
-                    variant={selectedCategories.includes(category) ? "default" : "outline"}
-                    className="cursor-pointer"
-                    onClick={() => toggleCategory(category)}
-                  >
-                    {category}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         <DialogFooter>

@@ -12,12 +12,11 @@ import {
 import { loadFromStorage } from "@/lib/storage"
 import type { AIServiceConfig } from "@/types/product"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, Sparkles, Eye, EyeOff } from "lucide-react"
+import { Loader2, Sparkles } from "lucide-react"
 import type { Product } from "@/types/product"
 
 interface AIEnhancementDialogProps {
@@ -50,7 +49,7 @@ export function AIEnhancementDialog({ product, onEnhancementComplete }: AIEnhanc
   const [tasks, setTasks] = useState({
     summarize: true,
     highlights: true,
-    tags: true,
+    domain: true,
     features: true, // Add features generation task
   })
   const [preview, setPreview] = useState<any>(null)
@@ -104,8 +103,8 @@ export function AIEnhancementDialog({ product, onEnhancementComplete }: AIEnhanc
           product: {
             name: product.name,
             description: product.description,
-            tags: product.tags,
             features: product.features,
+            domain: product.domain,
           },
           tasks: selectedTasks,
           apiKey: selectedProvider?.requiresKey ? (serviceConfig?.apiKey || apiKey) : undefined,
@@ -150,7 +149,7 @@ export function AIEnhancementDialog({ product, onEnhancementComplete }: AIEnhanc
             AI Enhancement
           </DialogTitle>
           <DialogDescription>
-            Use AI to enhance "{product.name}" with better descriptions, highlights, and tags.
+            Use AI to enhance "{product.name}" with better descriptions, highlights, and domain suggestions.
           </DialogDescription>
         </DialogHeader>
 
@@ -198,22 +197,22 @@ export function AIEnhancementDialog({ product, onEnhancementComplete }: AIEnhanc
                 </div>
                 <div className="flex items-center space-x-2">
                   <Checkbox
-                    id="tags"
-                    checked={tasks.tags}
-                    onCheckedChange={(checked) => setTasks({ ...tasks, tags: checked as boolean })}
-                  />
-                  <Label htmlFor="tags" className="text-sm">
-                    Suggest relevant tags
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
                     id="features"
                     checked={tasks.features}
                     onCheckedChange={(checked) => setTasks({ ...tasks, features: checked as boolean })}
                   />
                   <Label htmlFor="features" className="text-sm">
                     Generate key features (2-3 points, 7-10 words each)
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="domain"
+                    checked={tasks.domain}
+                    onCheckedChange={(checked) => setTasks({ ...tasks, domain: checked as boolean })}
+                  />
+                  <Label htmlFor="domain" className="text-sm">
+                    Recommend the best domain
                   </Label>
                 </div>
               </div>
@@ -234,13 +233,13 @@ export function AIEnhancementDialog({ product, onEnhancementComplete }: AIEnhanc
               <div className="mt-2 p-3 bg-muted rounded-lg">
                 <h4 className="font-medium">{product.name}</h4>
                 <p className="text-sm text-muted-foreground mt-1">{product.description}</p>
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {product.tags.slice(0, 4).map((tag) => (
-                    <Badge key={tag} variant="outline" className="text-xs">
-                      {tag}
+                {product.domain && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    <Badge variant="outline" className="text-xs">
+                      Domain: {product.domain}
                     </Badge>
-                  ))}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -269,19 +268,6 @@ export function AIEnhancementDialog({ product, onEnhancementComplete }: AIEnhanc
                     </div>
                   )}
 
-                  {preview.suggestedTags && (
-                    <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
-                      <Label className="text-xs font-medium text-primary">Suggested Tags</Label>
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {preview.suggestedTags.map((tag: string) => (
-                          <Badge key={tag} variant="secondary" className="text-xs">
-                            {tag}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
                   {preview.features && (
                     <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
                       <Label className="text-xs font-medium text-green-600">Generated Features</Label>
@@ -293,6 +279,13 @@ export function AIEnhancementDialog({ product, onEnhancementComplete }: AIEnhanc
                           </li>
                         ))}
                       </ul>
+                    </div>
+                  )}
+
+                  {preview.suggestedDomain && (
+                    <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                      <Label className="text-xs font-medium text-blue-600">Suggested Domain</Label>
+                      <p className="text-sm mt-1 font-medium">{preview.suggestedDomain}</p>
                     </div>
                   )}
 

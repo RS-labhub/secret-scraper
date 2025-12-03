@@ -130,16 +130,9 @@ export async function POST(request: NextRequest) {
     // Apply domain and category filters if specified
     if (filters?.domain?.length) {
       products = products.filter(product => 
-        product.domains.some(domain => filters.domain?.includes(domain))
+        product.domain && filters.domain?.includes(product.domain)
       )
       console.log(`🔍 Filtered by domains: ${products.length} products remaining`)
-    }
-
-    if (filters?.category?.length) {
-      products = products.filter(product => 
-        product.categories.some(category => filters.category?.includes(category))
-      )
-      console.log(`🔍 Filtered by categories: ${products.length} products remaining`)
     }
 
     // Apply query filter if specified
@@ -148,8 +141,9 @@ export async function POST(request: NextRequest) {
       products = products.filter(product => 
         product.name.toLowerCase().includes(query) ||
         product.description.toLowerCase().includes(query) ||
-        product.tags.some(tag => tag.toLowerCase().includes(query)) ||
-        product.features.some(feature => feature.toLowerCase().includes(query))
+        product.features.some(feature => feature.toLowerCase().includes(query)) ||
+        product.domain?.toLowerCase().includes(query) ||
+        product.metadata.language?.toLowerCase().includes(query)
       )
       console.log(`🔍 Filtered by query "${filters.query}": ${products.length} products remaining`)
     }

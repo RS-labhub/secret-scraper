@@ -31,8 +31,12 @@ export function ProductCard({ product, onProductUpdate, onProductDelete }: Produ
       },
       // Update actual features from AI highlights (2-3 features with 7-10 words each)
       features: enhancements.highlights || localProduct.features,
-      // Update domains to only have 1 domain
-      domains: enhancements.suggestedDomains ? [enhancements.suggestedDomains[0]] : localProduct.domains,
+      // Update domain if AI suggested one
+      domain:
+        enhancements.suggestedDomain ||
+        (enhancements.suggestedDomains && enhancements.suggestedDomains.length > 0
+          ? enhancements.suggestedDomains[0]
+          : localProduct.domain),
     }
     setLocalProduct(updatedProduct)
     onProductUpdate(productId, updatedProduct)
@@ -145,8 +149,7 @@ export function ProductCard({ product, onProductUpdate, onProductDelete }: Produ
 
   // Use AI-enhanced content if available
   const displayDescription = localProduct.aiEnhanced?.summary || localProduct.description
-  // Ensure only 1 domain is displayed
-  const displayDomains = (localProduct.aiEnhanced?.suggestedDomains || localProduct.domains).slice(0, 1)
+  const displayDomain = localProduct.aiEnhanced?.suggestedDomain || localProduct.domain
   const metrics = getMetricsByTimePeriod()
   
   // Ensure we have exactly 2-3 features
@@ -219,7 +222,7 @@ export function ProductCard({ product, onProductUpdate, onProductDelete }: Produ
           <div className="flex items-center gap-4 text-xs">
             {metrics.total > 0 && (
               <div className="flex items-center gap-1">
-                <span className="text-muted-foreground">Upvotes:</span>
+                <span className="text-muted-foreground capitalize">{metrics.type}:</span>
                 <span className="font-medium">{metrics.icon} {metrics.total.toLocaleString()}</span>
               </div>
             )}
@@ -229,21 +232,16 @@ export function ProductCard({ product, onProductUpdate, onProductDelete }: Produ
                 <span className="font-medium">+{metrics.period} {metrics.periodLabel}</span>
               </div>
             )} */}
-            {localProduct.pricing && (
-              <Badge variant="outline" className="text-xs capitalize">
-                {localProduct.pricing.type}
-              </Badge>
-            )}
           </div>
         )}
 
         {/* Domain (only 1) */}
-        {displayDomains && displayDomains.length > 0 && (
+        {displayDomain && (
           <div>
             <div className="text-xs font-medium text-muted-foreground mb-2">Domain</div>
             <div className="flex flex-wrap gap-1 max-w-full">
-              <Badge key={displayDomains[0]} variant="secondary" className="text-xs py-0 px-2 truncate max-w-20">
-                {displayDomains[0]}
+              <Badge variant="secondary" className="text-xs py-0 px-2 truncate max-w-20">
+                {displayDomain}
               </Badge>
             </div>
           </div>

@@ -1,7 +1,6 @@
 export interface ExportOptions {
   format: "json" | "csv" | "xml" | "markdown"
   includeMetadata?: boolean
-  includeAiEnhancements?: boolean
   dateRange?: {
     start?: Date
     end?: Date
@@ -34,20 +33,12 @@ export class ProductExporter {
         forks: product.metadata?.forks,
         language: product.metadata?.language,
         license: product.metadata?.license,
-        domains: product.domains,
-        categories: product.categories,
-        ...(product.features && product.features.length > 0 ? { features: product.features } : {}),
-        pricing: product.pricing,
-        source: product.source,
-        status: product.status,
-        scrapedAt: product.metadata?.scrapedAt,
-        ...(options.includeAiEnhancements && product.aiEnhanced
-          ? {
-              aiSummary: product.aiEnhanced.summary,
-              aiSuggestedDomains: product.aiEnhanced.suggestedDomains,
-              aiSuggestedCategories: product.aiEnhanced.suggestedCategories,
-            }
+        ...(product.domains?.length
+          ? { domain: product.domains[0] }
           : {}),
+        ...(product.features && product.features.length > 0 ? { features: product.features } : {}),
+        source: product.source,
+        scrapedAt: product.metadata?.scrapedAt,
       })),
     }
 
@@ -55,11 +46,7 @@ export class ProductExporter {
   }
 
   static exportToCSV(products: any[], options: ExportOptions = { format: "csv" }) {
-    const headers = ["ID", "Name", "Description", "Logo URL", "Website URL", "Repository URL", "Product Hunt URL", "Stars", "Upvotes", "Language", "Domains", "Categories", "Features", "Pricing", "Source", "Status", "Scraped At"]
-
-    if (options.includeAiEnhancements) {
-      headers.push("AI Summary", "AI Suggested Domains", "AI Suggested Categories")
-    }
+  const headers = ["ID", "Name", "Description", "Logo URL", "Website URL", "Repository URL", "Product Hunt URL", "Stars", "Upvotes", "Language", "Domain", "Features", "Source", "Scraped At"]
 
     const csvRows = [headers.join(",")]
 
@@ -75,22 +62,11 @@ export class ProductExporter {
         product.metadata?.stars || "",
         product.metadata?.upvotes || "",
         product.metadata?.language || "",
-        `"${product.domains?.join("; ") || ""}"`,
-        `"${product.categories?.join("; ") || ""}"`,
+        `"${product.domains?.[0] || ""}"`,
         `"${product.features?.join("; ") || ""}"`,
-        `"${product.pricing?.type || ""}"`,
         product.source || "",
-        product.status || "",
         product.metadata?.scrapedAt || "",
       ]
-
-      if (options.includeAiEnhancements && product.aiEnhanced) {
-        row.push(
-          `"${product.aiEnhanced.summary?.replace(/"/g, '""') || ""}"`,
-          `"${product.aiEnhanced.suggestedDomains?.join("; ") || ""}"`,
-          `"${product.aiEnhanced.suggestedCategories?.join("; ") || ""}"`,
-        )
-      }
 
       csvRows.push(row.join(","))
     })
@@ -131,16 +107,9 @@ export class ProductExporter {
       xml += `      <license>${product.metadata?.license || ""}</license>\n`
       xml += `      <scrapedAt>${product.metadata?.scrapedAt || ""}</scrapedAt>\n`
       xml += `    </metadata>\n`
-      xml += `    <domains>\n`
-      product.domains?.forEach((domain: string) => {
-        xml += `      <domain><![CDATA[${domain}]]></domain>\n`
-      })
-      xml += `    </domains>\n`
-      xml += `    <categories>\n`
-      product.categories?.forEach((category: string) => {
-        xml += `      <category><![CDATA[${category}]]></category>\n`
-      })
-      xml += `    </categories>\n`
+      if (product.domains?.[0]) {
+        xml += `    <domain><![CDATA[${product.domains[0]}]]></domain>\n`
+      }
       if (product.features && product.features.length > 0) {
         xml += `    <features>\n`
         product.features.forEach((feature: string) => {
@@ -148,25 +117,7 @@ export class ProductExporter {
         })
         xml += `    </features>\n`
       }
-      xml += `    <pricing><![CDATA[${product.pricing?.type || ""}]]></pricing>\n`
       xml += `    <source>${product.source || ""}</source>\n`
-      xml += `    <status>${product.status || ""}</status>\n`
-
-      if (options.includeAiEnhancements && product.aiEnhanced) {
-        xml += `    <aiEnhancements>\n`
-        xml += `      <summary><![CDATA[${product.aiEnhanced.summary || ""}]]></summary>\n`
-        xml += `      <suggestedDomains>\n`
-        product.aiEnhanced.suggestedDomains?.forEach((domain: string) => {
-          xml += `        <domain><![CDATA[${domain}]]></domain>\n`
-        })
-        xml += `      </suggestedDomains>\n`
-        xml += `      <suggestedCategories>\n`
-        product.aiEnhanced.suggestedCategories?.forEach((category: string) => {
-          xml += `        <category><![CDATA[${category}]]></category>\n`
-        })
-        xml += `      </suggestedCategories>\n`
-        xml += `    </aiEnhancements>\n`
-      }
 
       xml += "  </product>\n"
     })
@@ -222,12 +173,6 @@ export class ProductExporter {
         markdown += `\n`
       }
 
-      // AI Enhanced content
-      if (options.includeAiEnhancements && product.aiEnhanced) {
-        if (product.aiEnhanced.summary) {
-          markdown += `**AI Summary**: ${product.aiEnhanced.summary}\n\n`
-        }
-      }
 
       // Links
       if (product.links) {

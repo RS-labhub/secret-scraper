@@ -123,7 +123,8 @@ export function PublishDialog({ products, cmsConfig, onPublishComplete }: Publis
                     <div>
                       <p className="font-medium text-sm">{product.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {product.source} • {product.tags.slice(0, 3).join(", ")}
+                        {product.source}
+                        {product.domain && ` • ${product.domain}`}
                       </p>
                     </div>
                     <Badge variant="outline" className="text-xs">

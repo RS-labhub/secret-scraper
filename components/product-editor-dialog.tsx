@@ -18,7 +18,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Edit, X, Plus, Save, ExternalLink, Trash2, Github, Sparkles, Loader2, Undo2 } from "lucide-react"
-import type { Product, AIServiceConfig } from "@/types/product"
+import type { Product, AIServiceConfig, Domain } from "@/types/product"
+import { DOMAINS } from "@/types/product"
 import { loadFromStorage } from "@/lib/storage"
 
 interface ProductEditorDialogProps {
@@ -28,13 +29,9 @@ interface ProductEditorDialogProps {
 
 export function ProductEditorDialog({ product, onProductUpdate }: ProductEditorDialogProps) {
   const [open, setOpen] = useState(false)
-  // Initialize with current tags (not AI suggestions) to ensure manual edits are preserved
   const [editedProduct, setEditedProduct] = useState<Product>({ 
     ...product,
-    // Ensure we start with the actual tags, not AI suggestions
-    tags: product.tags || []
   })
-  const [newTag, setNewTag] = useState("")
   const [newFeature, setNewFeature] = useState("")
   const [isEnhancing, setIsEnhancing] = useState(false)
   const [enhancementError, setEnhancementError] = useState<string | null>(null)
@@ -46,8 +43,6 @@ export function ProductEditorDialog({ product, onProductUpdate }: ProductEditorD
   useEffect(() => {
     setEditedProduct({ 
       ...product,
-      // Ensure we start with the actual tags, not AI suggestions
-      tags: product.tags || []
     })
     // Check if product already has AI enhanced description
     if (product.aiEnhanced?.summary) {
@@ -58,31 +53,9 @@ export function ProductEditorDialog({ product, onProductUpdate }: ProductEditorD
   }, [product, open]) // Also trigger when dialog opens
 
   const handleSave = () => {
-    console.log('Saving product with tags:', editedProduct.tags)
-    console.log('Full edited product:', editedProduct)
+    console.log('Saving product:', editedProduct)
     onProductUpdate(product.id, editedProduct)
     setOpen(false)
-  }
-
-  const addTag = () => {
-    if (newTag.trim() && !editedProduct.tags.includes(newTag.trim())) {
-      setEditedProduct({
-        ...editedProduct,
-        tags: [...editedProduct.tags, newTag.trim()],
-      })
-      setNewTag("")
-    }
-  }
-
-  const removeTag = (tagToRemove: string) => {
-    console.log('Removing tag:', tagToRemove)
-    console.log('Current tags:', editedProduct.tags)
-    const newTags = editedProduct.tags.filter((tag) => tag !== tagToRemove)
-    console.log('New tags after removal:', newTags)
-    setEditedProduct({
-      ...editedProduct,
-      tags: newTags,
-    })
   }
 
   const addFeature = () => {
@@ -102,24 +75,10 @@ export function ProductEditorDialog({ product, onProductUpdate }: ProductEditorD
     })
   }
 
-  const clearAllTags = () => {
-    setEditedProduct({
-      ...editedProduct,
-      tags: [],
-    })
-  }
-
   const clearAllFeatures = () => {
     setEditedProduct({
       ...editedProduct,
       features: [],
-    })
-  }
-
-  const updatePricing = (type: "free" | "paid" | "freemium") => {
-    setEditedProduct({
-      ...editedProduct,
-      pricing: { ...editedProduct.pricing, type },
     })
   }
 
@@ -167,8 +126,8 @@ export function ProductEditorDialog({ product, onProductUpdate }: ProductEditorD
           product: {
             name: editedProduct.name,
             description: editedProduct.description,
-            tags: editedProduct.tags,
             features: editedProduct.features,
+            domain: editedProduct.domain,
           },
           tasks: ["summarize", "highlights", "domains"],
           apiKey: enabledService.apiKey,
@@ -190,14 +149,22 @@ export function ProductEditorDialog({ product, onProductUpdate }: ProductEditorD
       setEditedProduct({
         ...editedProduct,
         description: enhancements.summary || editedProduct.description,
-        features: enhancements.highlights || [],
-        domains: enhancements.suggestedDomains ? [enhancements.suggestedDomains[0]] : editedProduct.domains,
+        features: enhancements.highlights || editedProduct.features,
+        domain:
+          enhancements.suggestedDomain ||
+          (enhancements.suggestedDomains && enhancements.suggestedDomains.length > 0
+            ? enhancements.suggestedDomains[0]
+            : editedProduct.domain),
         aiEnhanced: {
           ...editedProduct.aiEnhanced,
           summary: enhancements.summary,
           originalLanguage: enhancements.originalLanguage,
           highlights: enhancements.highlights,
-          suggestedDomains: enhancements.suggestedDomains,
+          suggestedDomain:
+            enhancements.suggestedDomain ||
+            (enhancements.suggestedDomains && enhancements.suggestedDomains.length > 0
+              ? enhancements.suggestedDomains[0]
+              : editedProduct.aiEnhanced?.suggestedDomain),
         },
       })
     } catch (error) {
@@ -304,19 +271,47 @@ export function ProductEditorDialog({ product, onProductUpdate }: ProductEditorD
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="website">Website URL</Label>
-                  <Input
-                    id="website"
-                    value={editedProduct.links.website || editedProduct.links.repository || ""}
-                    onChange={(e) =>
+                  <Label htmlFor="domain">Domain</Label>
+                  <Select
+                    value={editedProduct.domain || ""}
+                    onValueChange={(value) =>
                       setEditedProduct({
                         ...editedProduct,
-                        links: { ...editedProduct.links, website: e.target.value },
+                        domain: value as Domain,
                       })
                     }
-                    placeholder={editedProduct.links.repository || "Enter website URL"}
-                  />
+                  >
+                    <SelectTrigger id="domain">
+                      <SelectValue placeholder="Select a domain" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DOMAINS.map((domain) => (
+                        <SelectItem key={domain} value={domain}>
+                          {domain}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {editedProduct.aiEnhanced?.suggestedDomain &&
+                    editedProduct.aiEnhanced.suggestedDomain !== editedProduct.domain && (
+                      <p className="text-xs text-muted-foreground">
+                        AI suggestion: {editedProduct.aiEnhanced.suggestedDomain}.{" "}
+                        <button
+                          type="button"
+                          className="text-primary underline"
+                          onClick={() =>
+                            setEditedProduct({
+                              ...editedProduct,
+                              domain: editedProduct.aiEnhanced?.suggestedDomain,
+                            })
+                          }
+                        >
+                          Apply suggestion
+                        </button>
+                      </p>
+                    )}
                 </div>
+
               </div>
 
               <div className="space-y-4">
@@ -339,25 +334,27 @@ export function ProductEditorDialog({ product, onProductUpdate }: ProductEditorD
                         </Button>
                       </div>
                     )}
-                    <div className="space-y-2">
-                      <Label htmlFor="website" className="text-sm font-medium">Website URL</Label>
-                      <Input
-                        id="website"
-                        type="url"
-                        placeholder={editedProduct.links.repository || "https://example.com"}
-                        value={editedProduct.links.website || ""}
-                        onChange={(e) => setEditedProduct({
-                          ...editedProduct,
-                          links: { ...editedProduct.links, website: e.target.value }
-                        })}
-                      />
-                    </div>
                     {editedProduct.metadata.stars && (
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium">Stars:</span>
                         <span className="text-sm">{editedProduct.metadata.stars}</span>
                       </div>
                     )}
+                    <div className="space-y-2 pt-2 border-t border-muted">
+                      <Label htmlFor="website" className="text-sm font-medium">Website URL</Label>
+                      <Input
+                        id="website"
+                        type="url"
+                        placeholder={editedProduct.links.repository || "https://example.com"}
+                        value={editedProduct.links.website || editedProduct.links.repository || ""}
+                        onChange={(e) =>
+                          setEditedProduct({
+                            ...editedProduct,
+                            links: { ...editedProduct.links, website: e.target.value },
+                          })
+                        }
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -500,6 +497,15 @@ export function ProductEditorDialog({ product, onProductUpdate }: ProductEditorD
                   <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
                     {editedProduct.description}
                   </p>
+
+                  {editedProduct.domain && (
+                    <div className="mb-4">
+                      <div className="text-xs font-medium text-muted-foreground mb-1">Domain</div>
+                      <Badge variant="secondary" className="text-xs">
+                        {editedProduct.domain}
+                      </Badge>
+                    </div>
+                  )}
 
                   {editedProduct.features && editedProduct.features.length > 0 && (
                     <div className="mb-4">

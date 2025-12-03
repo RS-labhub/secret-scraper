@@ -19,7 +19,6 @@ export interface ProductHuntProduct {
   description: string;
   product_url?: string;
   votes: number;
-  tags: string[];
   scraped_at: string;
 }
 
@@ -58,7 +57,7 @@ export class ProductHuntScraper {
         throw new Error("HTML content is empty");
       }
 
-      console.log(`✅ Received HTML content, length: ${htmlContent.length}`);
+      console.log(`Received HTML content, length: ${htmlContent.length}`);
 
   // Parse HTML and extract products
   // Use products page extraction for /products scraping
@@ -67,7 +66,7 @@ export class ProductHuntScraper {
   console.log(`🎉 Found ${products.length} products`);
   return products;
     } catch (error) {
-      console.error(`❌ Error scraping ProductHunt: ${error}`);
+      console.error(`Error scraping ProductHunt: ${error}`);
       throw error;
     }
   }
@@ -170,8 +169,6 @@ export class ProductHuntScraper {
                   }
                 }
               }
-              // Tags (not available directly, fallback to empty)
-              const tags: string[] = [];
               // Upvotes (not available directly, fallback to 0)
               const votes = 0;
               if (title) {
@@ -179,9 +176,7 @@ export class ProductHuntScraper {
                   id: `ph-products-${Date.now()}-${index}`,
                   name: title,
                   description: description || `${title} - Product from ProductHunt`,
-                  tags,
-                  domains: [],
-                  categories: [],
+                  domain: undefined,
                   features: [],
                   logoUrl,
                   links: {
@@ -239,17 +234,6 @@ export class ProductHuntScraper {
       const voteMatch = sectionHtml.match(/data-test="vote-button"[^>]*>.*?<p[^>]*>(\d+)</);
       const votes = voteMatch ? parseInt(voteMatch[1], 10) : 0;
 
-      // Extract tags (simplified)
-      const tagRegex = />([^<]{2,20})</g;
-      const tags: string[] = [];
-      let tagMatch;
-      while ((tagMatch = tagRegex.exec(sectionHtml)) !== null) {
-        const tag = tagMatch[1].trim();
-        if (tag.length > 2 && tag.length < 20 && !tag.includes('http') && !tag.includes('data-')) {
-          tags.push(tag);
-        }
-      }
-
       if (!title) {
         console.warn(`⚠️ No title found for product ${index}`);
         return null;
@@ -259,9 +243,7 @@ export class ProductHuntScraper {
         id: `ph-${Date.now()}-${index}`,
         name: title,
         description: description || `${title} - Product from ProductHunt`,
-        tags: tags.slice(0, 5), // Limit to 5 tags
-        domains: [], // Will be determined by AI enhancement
-        categories: [], // Will be determined by AI enhancement
+        domain: undefined, // Will be determined by AI enhancement
         features: [], // Will be extracted during AI enhancement
         logoUrl,
         links: {
@@ -337,18 +319,12 @@ export class ProductHuntScraper {
             upvotes = upvoteText ? parseInt(upvoteText, 10) : 0;
           }
 
-          // Tags
-          const tagElements = section.querySelectorAll('div[data-sentry-component="TagList"] a');
-          const tags = Array.from(tagElements).map(tag => tag.textContent?.trim() || '').filter(Boolean);
-
           if (title) {
             products.push({
               id: `ph-leaderboard-${Date.now()}-${index}`,
               name: title,
               description,
-              tags,
-              domains: [],
-              categories: [],
+              domain: undefined,
               features: [],
               logoUrl,
               links: {
@@ -392,7 +368,7 @@ export async function scrapeProductHunt(options: ProductHuntScrapingOptions): Pr
     // Default to leaderboard
     return await scraper.scrapeLeaderboard(options);
   } catch (error) {
-    console.error(`❌ ProductHunt scraping failed:`, error);
+    console.error(`ProductHunt scraping failed:`, error);
     throw error;
   }
 }

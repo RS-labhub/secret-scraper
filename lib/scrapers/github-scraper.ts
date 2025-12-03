@@ -12,10 +12,6 @@ interface TrendingRepo {
   language?: string
   contributors: string[]
   topics?: string[]
-  pricing?: {
-    type: "free" | "paid" | "freemium"
-    plans?: string[]
-  }
   features?: string[]
   website?: string
   documentation?: string
@@ -537,29 +533,17 @@ export class GitHubScraper {
   }
 
   private convertToProduct(repo: TrendingRepo, timePeriod: "daily" | "weekly" | "monthly"): Product {
-    const domains = this.classifyDomains(repo)
+    const domain = this.classifyDomain(repo)
     
     // Clean the repository name to remove any HTML artifacts
     const cleanName = repo.name.replace(/[<>\"']/g, '').replace(/\s+/g, ' ').trim()
     
-    const product = {
+    const product: Product = {
       id: `github-${repo.fullName.replace(/[\/\s]/g, '-').toLowerCase()}`,
       name: cleanName,
       description: repo.description || "No description available",
-      tags: [
-        ...(repo.topics || []),
-        ...(repo.language ? [repo.language] : []),
-        "open-source",
-        "trending",
-        timePeriod
-      ],
-      categories: [], // Will be set by AI classification
-      domains,
-      pricing: repo.pricing || {
-        type: "free" as const,
-        plans: ["Open Source"]
-      },
-      features: [], // No features initially - will be added via AI enhancement
+      domain,
+      features: repo.features || [],
       links: {
         repository: repo.url,
         website: repo.website,
@@ -583,7 +567,7 @@ export class GitHubScraper {
     return product
   }
 
-  private classifyDomains(repo: TrendingRepo): Domain[] {
+  private classifyDomain(repo: TrendingRepo): Domain {
     const domains: Domain[] = []
     const name = repo.name.toLowerCase()
     const description = repo.description?.toLowerCase() || ""
@@ -655,10 +639,10 @@ export class GitHubScraper {
 
     // Default to Code if no specific domain found
     if (domains.length === 0) {
-      domains.push("Code")
+      return "Code"
     }
 
-    return domains
+    return domains[0]
   }
 
   private shouldIncludeProduct(product: Product, filters?: ScrapeRequest["filters"]): boolean {
@@ -666,22 +650,8 @@ export class GitHubScraper {
 
     // Filter by domains
     if (filters.domain && filters.domain.length > 0) {
-      const hasMatchingDomain = product.domains.some(domain => 
-        filters.domain!.includes(domain)
-      )
-      if (!hasMatchingDomain) {
+      if (!product.domain || !filters.domain.includes(product.domain)) {
         console.log(`🚫 Excluding ${product.name} - domain filter mismatch`)
-        return false
-      }
-    }
-
-    // Filter by categories
-    if (filters.category && filters.category.length > 0) {
-      const hasMatchingCategory = product.categories.some(category => 
-        filters.category!.includes(category)
-      )
-      if (!hasMatchingCategory) {
-        console.log(`🚫 Excluding ${product.name} - category filter mismatch`)
         return false
       }
     }
@@ -689,7 +659,8 @@ export class GitHubScraper {
     // Filter by technology stack/programming language
     if (filters.techStack && filters.techStack.length > 0) {
       const productLanguage = product.metadata.language?.toLowerCase()
-      const productTags = product.tags.map(tag => tag.toLowerCase())
+      const productName = product.name.toLowerCase()
+      const productDescription = product.description.toLowerCase()
       
       const hasMatchingTechStack = filters.techStack.some(tech => {
         const techLower = tech.toLowerCase()
@@ -710,8 +681,8 @@ export class GitHubScraper {
         if (variations[techLower]?.includes(productLanguage || '')) return true
         if (productLanguage && variations[productLanguage]?.includes(techLower)) return true
         
-        // Check tags
-        return productTags.some(tag => tag.includes(techLower) || techLower.includes(tag))
+        // Fallback to name/description keywords
+        return productName.includes(techLower) || productDescription.includes(techLower)
       })
       
       if (!hasMatchingTechStack) {

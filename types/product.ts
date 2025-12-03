@@ -35,13 +35,7 @@ export interface Product {
   id: string
   name: string
   description: string
-  tags: string[]
-  domains: Domain[]
-  categories: Category[]
-  pricing?: {
-    type: "free" | "paid" | "freemium"
-    plans?: string[]
-  }
+  domain?: Domain
   features: string[]
   logoUrl?: string // URL to the product logo (especially for ProductHunt products)
   links: {
@@ -81,9 +75,7 @@ export interface Product {
     summary?: string
     originalLanguage?: string
     highlights?: string[]
-    suggestedTags?: string[]
-    suggestedDomains?: Domain[]
-    suggestedCategories?: Category[]
+    suggestedDomain?: Domain
   }
 }
 

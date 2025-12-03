@@ -92,10 +92,9 @@ export function BulkAIEnhancementDialog({
             product: {
               name: product.name,
               description: product.description,
-              tags: product.tags,
               features: product.features,
               source: product.source,
-              pricing: product.pricing,
+              domain: product.domain,
             },
             tasks: ["summarize", "highlights", "domains"],
           }),
@@ -111,8 +110,8 @@ export function BulkAIEnhancementDialog({
             updatedProducts[productIndex] = {
               ...updatedProducts[productIndex],
               description: enhancement.summary || updatedProducts[productIndex].description,
-              features: enhancement.highlights || [],
-              domains: enhancement.suggestedDomains ? [enhancement.suggestedDomains[0]] : updatedProducts[productIndex].domains,
+              features: enhancement.highlights || updatedProducts[productIndex].features,
+              domain: enhancement.suggestedDomain || updatedProducts[productIndex].domain,
               aiEnhanced: enhancement,
             }
           }

@@ -46,7 +46,10 @@ export function SchemaBuilderDialog({
     required: false,
   })
 
-  const availableProperties = SchemaManager.getAvailableProperties()
+  const deprecatedProperties = new Set(["tags", "domains", "categories", "pricing"])
+  const availableProperties = SchemaManager.getAvailableProperties().filter(
+    (prop) => !deprecatedProperties.has(prop.path) && !prop.path.startsWith("aiEnhanced."),
+  )
 
   useEffect(() => {
     loadSchemas()

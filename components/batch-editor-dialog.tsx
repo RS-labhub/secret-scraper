@@ -16,94 +16,88 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Edit3, Save, X, Plus } from "lucide-react"
-import type { Product } from "@/types/product"
+import { DOMAINS } from "@/types/product"
+import type { Domain, Product } from "@/types/product"
+
+type BatchUpdatePayload = Partial<Product> & {
+  featureOperations?: {
+    add?: string[]
+    remove?: string[]
+  }
+}
+
+type BatchUpdatesState = {
+  status?: Product["status"]
+  domain?: Domain
+  addFeatures?: string[]
+  removeFeatures?: string[]
+}
 
 interface BatchEditorDialogProps {
   selectedProducts: Product[]
-  onBatchUpdate: (productIds: string[], updates: Partial<Product>) => void
+  onBatchUpdate: (productIds: string[], updates: BatchUpdatePayload) => void
   onClearSelection: () => void
 }
 
 export function BatchEditorDialog({ selectedProducts, onBatchUpdate, onClearSelection }: BatchEditorDialogProps) {
   const [open, setOpen] = useState(false)
-  const [batchUpdates, setBatchUpdates] = useState<{
-    status?: Product["status"]
-    addTags?: string[]
-    removeTags?: string[]
-    addFeatures?: string[]
-    removeFeatures?: string[]
-    pricing?: Product["pricing"]
-  }>({})
-  const [newTag, setNewTag] = useState("")
+  const [batchUpdates, setBatchUpdates] = useState<BatchUpdatesState>({})
   const [newFeature, setNewFeature] = useState("")
+  const [featureToRemove, setFeatureToRemove] = useState("")
 
   const handleSave = () => {
-    const updates: Partial<Product> = {}
+    if (selectedProducts.length === 0) return
+
+    const updates: BatchUpdatePayload = {}
 
     if (batchUpdates.status) {
       updates.status = batchUpdates.status
     }
 
-    if (batchUpdates.pricing) {
-      updates.pricing = batchUpdates.pricing
+    if (batchUpdates.domain) {
+      updates.domain = batchUpdates.domain
     }
 
-    // Handle tag updates
-    if (batchUpdates.addTags?.length || batchUpdates.removeTags?.length) {
-      updates.tags = selectedProducts[0].tags // This will be processed per product
-    }
-
-    // Handle feature updates
     if (batchUpdates.addFeatures?.length || batchUpdates.removeFeatures?.length) {
-      updates.features = selectedProducts[0].features // This will be processed per product
+      updates.featureOperations = {
+        add: batchUpdates.addFeatures || [],
+        remove: batchUpdates.removeFeatures || [],
+      }
     }
 
     const productIds = selectedProducts.map((p) => p.id)
-    onBatchUpdate(productIds, { ...updates, batchUpdates })
+    onBatchUpdate(productIds, updates)
     setOpen(false)
     onClearSelection()
     setBatchUpdates({})
   }
 
-  const addTagToBatch = (type: "add" | "remove") => {
-    if (!newTag.trim()) return
-
-    if (type === "add") {
-      setBatchUpdates({
-        ...batchUpdates,
-        addTags: [...(batchUpdates.addTags || []), newTag.trim()],
-      })
-    } else {
-      setBatchUpdates({
-        ...batchUpdates,
-        removeTags: [...(batchUpdates.removeTags || []), newTag.trim()],
-      })
-    }
-    setNewTag("")
-  }
-
   const addFeatureToBatch = (type: "add" | "remove") => {
-    if (!newFeature.trim()) return
+    const value = type === "add" ? newFeature : featureToRemove
+    if (!value.trim()) return
 
     if (type === "add") {
-      setBatchUpdates({
-        ...batchUpdates,
-        addFeatures: [...(batchUpdates.addFeatures || []), newFeature.trim()],
-      })
+      setBatchUpdates((prev) => ({
+        ...prev,
+        addFeatures: [...(prev.addFeatures || []), value.trim()],
+      }))
+      setNewFeature("")
     } else {
-      setBatchUpdates({
-        ...batchUpdates,
-        removeFeatures: [...(batchUpdates.removeFeatures || []), newFeature.trim()],
-      })
+      setBatchUpdates((prev) => ({
+        ...prev,
+        removeFeatures: [...(prev.removeFeatures || []), value.trim()],
+      }))
+      setFeatureToRemove("")
     }
-    setNewFeature("")
   }
 
-  const removeFromBatch = (type: "addTags" | "removeTags" | "addFeatures" | "removeFeatures", item: string) => {
-    setBatchUpdates({
-      ...batchUpdates,
-      [type]: batchUpdates[type]?.filter((i) => i !== item),
-    })
+  type FeatureBatchKey = "addFeatures" | "removeFeatures"
+
+  const removeFeatureFromBatch = (type: FeatureBatchKey, item: string) => {
+    setBatchUpdates((prev) => ({
+      ...prev,
+      [type]: (prev[type] || []).filter((i) => i !== item),
+    }))
   }
 
   return (
@@ -123,9 +117,8 @@ export function BatchEditorDialog({ selectedProducts, onBatchUpdate, onClearSele
         </DialogHeader>
 
         <Tabs defaultValue="status" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="status">Status & Pricing</TabsTrigger>
-            <TabsTrigger value="tags">Tags</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="status">Status & Domain</TabsTrigger>
             <TabsTrigger value="features">Features</TabsTrigger>
           </TabsList>
 
@@ -154,23 +147,23 @@ export function BatchEditorDialog({ selectedProducts, onBatchUpdate, onClearSele
 
               <div className="space-y-4">
                 <div>
-                  <Label className="text-base font-medium">Update Pricing</Label>
-                  <p className="text-sm text-muted-foreground">Set pricing model for all selected products</p>
+                  <Label className="text-base font-medium">Update Domain</Label>
+                  <p className="text-sm text-muted-foreground">Assign a primary domain to all selected products</p>
                 </div>
 
                 <Select
-                  value={batchUpdates.pricing?.type || ""}
-                  onValueChange={(value: "free" | "paid" | "freemium") =>
-                    setBatchUpdates({ ...batchUpdates, pricing: { type: value } })
-                  }
+                  value={batchUpdates.domain || ""}
+                  onValueChange={(value) => setBatchUpdates({ ...batchUpdates, domain: value as Domain })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select pricing model" />
+                    <SelectValue placeholder="Select domain" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="free">Free</SelectItem>
-                    <SelectItem value="freemium">Freemium</SelectItem>
-                    <SelectItem value="paid">Paid</SelectItem>
+                    {DOMAINS.map((domain) => (
+                      <SelectItem key={domain} value={domain}>
+                        {domain}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -194,68 +187,6 @@ export function BatchEditorDialog({ selectedProducts, onBatchUpdate, onClearSele
             </div>
           </TabsContent>
 
-          <TabsContent value="tags" className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Add Tags */}
-              <div className="space-y-4">
-                <div>
-                  <Label className="text-base font-medium">Add Tags</Label>
-                  <p className="text-sm text-muted-foreground">Tags to add to all selected products</p>
-                </div>
-
-                <div className="flex flex-wrap gap-2 min-h-[60px] p-3 border rounded-lg">
-                  {batchUpdates.addTags?.map((tag) => (
-                    <Badge key={tag} variant="secondary" className="flex items-center gap-1">
-                      + {tag}
-                      <X className="w-3 h-3 cursor-pointer" onClick={() => removeFromBatch("addTags", tag)} />
-                    </Badge>
-                  ))}
-                </div>
-
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Add tag..."
-                    value={newTag}
-                    onChange={(e) => setNewTag(e.target.value)}
-                    onKeyPress={(e) => e.key === "Enter" && addTagToBatch("add")}
-                  />
-                  <Button onClick={() => addTagToBatch("add")} size="sm">
-                    <Plus className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-
-              {/* Remove Tags */}
-              <div className="space-y-4">
-                <div>
-                  <Label className="text-base font-medium">Remove Tags</Label>
-                  <p className="text-sm text-muted-foreground">Tags to remove from all selected products</p>
-                </div>
-
-                <div className="flex flex-wrap gap-2 min-h-[60px] p-3 border rounded-lg">
-                  {batchUpdates.removeTags?.map((tag) => (
-                    <Badge key={tag} variant="destructive" className="flex items-center gap-1">
-                      - {tag}
-                      <X className="w-3 h-3 cursor-pointer" onClick={() => removeFromBatch("removeTags", tag)} />
-                    </Badge>
-                  ))}
-                </div>
-
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Remove tag..."
-                    value={newTag}
-                    onChange={(e) => setNewTag(e.target.value)}
-                    onKeyPress={(e) => e.key === "Enter" && addTagToBatch("remove")}
-                  />
-                  <Button onClick={() => addTagToBatch("remove")} size="sm" variant="destructive">
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </TabsContent>
-
           <TabsContent value="features" className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Add Features */}
@@ -271,7 +202,7 @@ export function BatchEditorDialog({ selectedProducts, onBatchUpdate, onClearSele
                       <span className="text-sm flex-1">+ {feature}</span>
                       <X
                         className="w-4 h-4 cursor-pointer text-muted-foreground"
-                        onClick={() => removeFromBatch("addFeatures", feature)}
+                        onClick={() => removeFeatureFromBatch("addFeatures", feature)}
                       />
                     </div>
                   ))}
@@ -282,7 +213,7 @@ export function BatchEditorDialog({ selectedProducts, onBatchUpdate, onClearSele
                     placeholder="Add feature..."
                     value={newFeature}
                     onChange={(e) => setNewFeature(e.target.value)}
-                    onKeyPress={(e) => e.key === "Enter" && addFeatureToBatch("add")}
+                    onKeyDown={(e) => e.key === "Enter" && addFeatureToBatch("add")}
                   />
                   <Button onClick={() => addFeatureToBatch("add")} size="sm">
                     <Plus className="w-4 h-4" />
@@ -303,7 +234,7 @@ export function BatchEditorDialog({ selectedProducts, onBatchUpdate, onClearSele
                       <span className="text-sm flex-1">- {feature}</span>
                       <X
                         className="w-4 h-4 cursor-pointer text-muted-foreground"
-                        onClick={() => removeFromBatch("removeFeatures", feature)}
+                        onClick={() => removeFeatureFromBatch("removeFeatures", feature)}
                       />
                     </div>
                   ))}
@@ -312,9 +243,9 @@ export function BatchEditorDialog({ selectedProducts, onBatchUpdate, onClearSele
                 <div className="flex gap-2">
                   <Input
                     placeholder="Remove feature..."
-                    value={newFeature}
-                    onChange={(e) => setNewFeature(e.target.value)}
-                    onKeyPress={(e) => e.key === "Enter" && addFeatureToBatch("remove")}
+                    value={featureToRemove}
+                    onChange={(e) => setFeatureToRemove(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && addFeatureToBatch("remove")}
                   />
                   <Button onClick={() => addFeatureToBatch("remove")} size="sm" variant="destructive">
                     <X className="w-4 h-4" />

@@ -1,31 +1,29 @@
+import type { Domain } from "@/types/product"
+
 export interface AIProvider {
   name: string
   models: string[]
   requiresApiKey: boolean
-  enhance(product: any, apiKey?: string): Promise<any>
-  classifyDomains?(product: any, apiKey?: string): Promise<string[]>
+  enhance(request: AIEnhancementRequest, apiKey?: string): Promise<AIEnhancementResult>
 }
 
 export interface AIEnhancementRequest {
   product: {
     name: string
     description: string
-    tags: string[]
     features: string[]
+    domain?: Domain
     source?: string
-    pricing?: any
   }
-  tasks: ("summarize" | "highlights" | "tags" | "features" | "domains" | "categories")[]
+  tasks: ("summarize" | "highlights" | "features" | "domains")[]
 }
 
 export interface AIEnhancementResult {
   summary?: string
   originalLanguage?: string
   highlights?: string[]
-  suggestedTags?: string[]
   features?: string[]
-  suggestedDomains?: string[]
-  suggestedCategories?: string[]
+  suggestedDomain?: Domain
 }
 
 export class OpenAIProvider implements AIProvider {
@@ -34,7 +32,7 @@ export class OpenAIProvider implements AIProvider {
   requiresApiKey = true
 
   async enhance(request: AIEnhancementRequest, apiKey: string): Promise<AIEnhancementResult> {
-    const { product, tasks } = request
+  const { product, tasks } = request
     const result: AIEnhancementResult = {}
 
     try {
@@ -52,12 +50,11 @@ export class OpenAIProvider implements AIProvider {
               content: `You are an AI assistant that enhances product information. Given a product, you can:
 - Summarize: Create a concise, compelling 1-2 sentence summary in English. If the original description is in another language, translate it to English and include "originalLanguage" field with the detected language name.
 - Highlights: Extract 2-5 key feature highlights (concise feature descriptions)
-- Tags: Suggest relevant tags/categories
-- Domains: Suggest ONLY 1 most relevant domain from: AIE, Code, DevOps, DevSecOps, Product, Quality Assurance, Orchestration
+- Domain: Suggest ONLY 1 most relevant domain from: AIE, Code, DevOps, DevSecOps, Product, Quality Assurance, Orchestration
 
 CRITICAL: 
 - For highlights, provide 2-5 concise features
-- For domains, suggest ONLY 1 domain, the most relevant one.
+- For domain, respond with the single most relevant value in a "suggestedDomain" field.
 - If description is not in English, translate it and set originalLanguage field.
 
 Respond in JSON format only.`,
@@ -66,7 +63,7 @@ Respond in JSON format only.`,
               role: "user",
               content: `Product: ${product.name}
 Description: ${product.description}
-Current Tags: ${product.tags.join(", ")}
+Current Domain: ${product.domain || "Unknown"}
 Current Features: ${product.features.join(", ")}
 
 Tasks requested: ${tasks.join(", ")}
@@ -74,7 +71,7 @@ Tasks requested: ${tasks.join(", ")}
 Please provide a JSON response with the requested enhancements. 
 IMPORTANT: 
 - Provide 2-5 concise feature highlights
-- Only 1 domain
+- Provide exactly one suggestedDomain value using the allowed taxonomy
 - If description is not in English, translate to English and include "originalLanguage" field`,
             },
           ],
@@ -108,11 +105,13 @@ IMPORTANT:
           const highlights = parsed.highlights.slice(0, 5)
           result.highlights = highlights.length >= 2 ? highlights : parsed.highlights.slice(0, 2)
         }
-        if (tasks.includes("tags")) result.suggestedTags = parsed.suggestedTags
         if (tasks.includes("features")) result.features = parsed.features
-        if (tasks.includes("domains") && parsed.suggestedDomains) {
-          // Ensure only 1 domain
-          result.suggestedDomains = [parsed.suggestedDomains[0]]
+        if (tasks.includes("domains")) {
+          if (parsed.suggestedDomain) {
+            result.suggestedDomain = parsed.suggestedDomain as Domain
+          } else if (parsed.suggestedDomains?.length) {
+            result.suggestedDomain = parsed.suggestedDomains[0] as Domain
+          }
         }
       }
     } catch (error) {
@@ -146,25 +145,24 @@ export class AnthropicProvider implements AIProvider {
           max_tokens: 500,
           messages: [
             {
-              role: "user",
+              role: "system",
               content: `You are an AI assistant that enhances product information. Given a product, you can:
 - Summarize: Create a concise, compelling 1-2 sentence summary
 - Highlights: Extract 2-3 key feature highlights (each MUST be exactly 7-10 words)
-- Tags: Suggest relevant tags/categories
-- Domains: Suggest ONLY 1 most relevant domain from: AIE, Code, DevOps, DevSecOps, Product, Quality Assurance, Orchestration
+- Domain: Suggest ONLY 1 most relevant domain from: AIE, Code, DevOps, DevSecOps, Product, Quality Assurance, Orchestration
 
 CRITICAL: 
 - For highlights, each feature MUST be between 7-10 words. No more, no less.
-- For domains, suggest ONLY 1 domain in suggestedDomains array, the most relevant one.
+- For domain, respond with a single value using "suggestedDomain".
 
 Product: ${product.name}
 Description: ${product.description}
-Current Tags: ${product.tags.join(", ")}
+Current Domain: ${product.domain || "Unknown"}
 Current Features: ${product.features.join(", ")}
 
 Tasks requested: ${tasks.join(", ")}
 
-Please provide a JSON response with the requested enhancements. Remember: Each highlight MUST be 7-10 words, and only 1 domain.`,
+Please provide a JSON response with the requested enhancements. Remember: Each highlight MUST be 7-10 words, and only 1 domain value in "suggestedDomain".`,
             },
           ],
         }),
@@ -192,11 +190,13 @@ Please provide a JSON response with the requested enhancements. Remember: Each h
           const highlights = parsed.highlights.slice(0, 3)
           result.highlights = highlights.length >= 2 ? highlights : parsed.highlights.slice(0, 2)
         }
-        if (tasks.includes("tags")) result.suggestedTags = parsed.suggestedTags
         if (tasks.includes("features")) result.features = parsed.features
-        if (tasks.includes("domains") && parsed.suggestedDomains) {
-          // Ensure only 1 domain
-          result.suggestedDomains = [parsed.suggestedDomains[0]]
+        if (tasks.includes("domains")) {
+          if (parsed.suggestedDomain) {
+            result.suggestedDomain = parsed.suggestedDomain as Domain
+          } else if (parsed.suggestedDomains?.length) {
+            result.suggestedDomain = parsed.suggestedDomains[0] as Domain
+          }
         }
       }
     } catch (error) {
@@ -232,12 +232,11 @@ export class GroqProvider implements AIProvider {
               content: `You are an AI assistant that enhances product information. Given a product, you can:
 - Summarize: Create a concise, compelling 1-2 sentence summary
 - Highlights: Extract 2-3 key feature highlights (each MUST be exactly 7-10 words)
-- Tags: Suggest relevant tags/categories
-- Domains: Suggest ONLY 1 most relevant domain from: AIE, Code, DevOps, DevSecOps, Product, Quality Assurance, Orchestration
+- Domain: Suggest ONLY 1 most relevant domain from: AIE, Code, DevOps, DevSecOps, Product, Quality Assurance, Orchestration
 
 CRITICAL: 
 - For highlights, each feature MUST be between 7-10 words. No more, no less.
-- For domains, suggest ONLY 1 domain, the most relevant one.
+- For domain, return a single value via "suggestedDomain".
 
 Respond in JSON format only.`,
             },
@@ -245,12 +244,12 @@ Respond in JSON format only.`,
               role: "user",
               content: `Product: ${product.name}
 Description: ${product.description}
-Current Tags: ${product.tags.join(", ")}
+Current Domain: ${product.domain || "Unknown"}
 Current Features: ${product.features.join(", ")}
 
 Tasks requested: ${tasks.join(", ")}
 
-Please provide a JSON response with the requested enhancements. Remember: Each highlight MUST be 7-10 words, and only 1 domain.`,
+Please provide a JSON response with the requested enhancements. Remember: Each highlight MUST be 7-10 words, and only 1 domain via "suggestedDomain".`,
             },
           ],
           temperature: 0.7,
@@ -280,11 +279,13 @@ Please provide a JSON response with the requested enhancements. Remember: Each h
           const highlights = parsed.highlights.slice(0, 3)
           result.highlights = highlights.length >= 2 ? highlights : parsed.highlights.slice(0, 2)
         }
-        if (tasks.includes("tags")) result.suggestedTags = parsed.suggestedTags
         if (tasks.includes("features")) result.features = parsed.features
-        if (tasks.includes("domains") && parsed.suggestedDomains) {
-          // Ensure only 1 domain
-          result.suggestedDomains = [parsed.suggestedDomains[0]]
+        if (tasks.includes("domains")) {
+          if (parsed.suggestedDomain) {
+            result.suggestedDomain = parsed.suggestedDomain as Domain
+          } else if (parsed.suggestedDomains?.length) {
+            result.suggestedDomain = parsed.suggestedDomains[0] as Domain
+          }
         }
       }
     } catch (error) {
@@ -323,21 +324,20 @@ export class GeminiProvider implements AIProvider {
                     text: `You are an AI assistant that enhances product information. Given a product, you can:
 - Summarize: Create a concise, compelling 1-2 sentence summary
 - Highlights: Extract 2-3 key feature highlights (each MUST be exactly 7-10 words)
-- Tags: Suggest relevant tags/categories
-- Domains: Suggest ONLY 1 most relevant domain from: AIE, Code, DevOps, DevSecOps, Product, Quality Assurance, Orchestration
+- Domain: Suggest ONLY 1 most relevant domain from: AIE, Code, DevOps, DevSecOps, Product, Quality Assurance, Orchestration
 
 CRITICAL: 
 - For highlights, each feature MUST be between 7-10 words. No more, no less.
-- For domains, suggest ONLY 1 domain in suggestedDomains array, the most relevant one.
+- For domain, return a single value using "suggestedDomain".
 
 Product: ${product.name}
 Description: ${product.description}
-Current Tags: ${product.tags.join(", ")}
+Current Domain: ${product.domain || "Unknown"}
 Current Features: ${product.features.join(", ")}
 
 Tasks requested: ${tasks.join(", ")}
 
-Please provide a JSON response with the requested enhancements. Remember: Each highlight MUST be 7-10 words, and only 1 domain.`,
+Please provide a JSON response with the requested enhancements. Remember: Each highlight MUST be 7-10 words, and only 1 domain via "suggestedDomain".`,
                   },
                 ],
               },
@@ -372,11 +372,13 @@ Please provide a JSON response with the requested enhancements. Remember: Each h
           const highlights = parsed.highlights.slice(0, 3)
           result.highlights = highlights.length >= 2 ? highlights : parsed.highlights.slice(0, 2)
         }
-        if (tasks.includes("tags")) result.suggestedTags = parsed.suggestedTags
         if (tasks.includes("features")) result.features = parsed.features
-        if (tasks.includes("domains") && parsed.suggestedDomains) {
-          // Ensure only 1 domain
-          result.suggestedDomains = [parsed.suggestedDomains[0]]
+        if (tasks.includes("domains")) {
+          if (parsed.suggestedDomain) {
+            result.suggestedDomain = parsed.suggestedDomain as Domain
+          } else if (parsed.suggestedDomains?.length) {
+            result.suggestedDomain = parsed.suggestedDomains[0] as Domain
+          }
         }
       }
     } catch (error) {
