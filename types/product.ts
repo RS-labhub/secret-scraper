@@ -79,6 +79,7 @@ export interface Product {
   status: "pending" | "approved" | "rejected" | "discarded"
   aiEnhanced?: {
     summary?: string
+    originalLanguage?: string
     highlights?: string[]
     suggestedTags?: string[]
     suggestedDomains?: Domain[]

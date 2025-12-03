@@ -97,7 +97,7 @@ export function BulkAIEnhancementDialog({
               source: product.source,
               pricing: product.pricing,
             },
-            tasks: ["summarize", "highlights", "tags", "domains", "categories"],
+            tasks: ["summarize", "highlights", "domains"],
           }),
         })
 
@@ -110,6 +110,9 @@ export function BulkAIEnhancementDialog({
           if (productIndex !== -1) {
             updatedProducts[productIndex] = {
               ...updatedProducts[productIndex],
+              description: enhancement.summary || updatedProducts[productIndex].description,
+              features: enhancement.highlights || [],
+              domains: enhancement.suggestedDomains ? [enhancement.suggestedDomains[0]] : updatedProducts[productIndex].domains,
               aiEnhanced: enhancement,
             }
           }

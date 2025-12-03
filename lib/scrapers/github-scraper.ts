@@ -521,7 +521,7 @@ export class GitHubScraper {
           language: data.language || repo.language,
           topics: data.topics?.length ? data.topics : repo.topics || [],
           website: data.homepage || undefined,
-          features: data.topics || repo.topics || [],
+          features: [], // No features initially - will be added via AI enhancement
         }
         
         console.log(`Enhanced ${repo.fullName} successfully`)
@@ -559,7 +559,7 @@ export class GitHubScraper {
         type: "free" as const,
         plans: ["Open Source"]
       },
-      features: repo.features || repo.topics || [],
+      features: [], // No features initially - will be added via AI enhancement
       links: {
         repository: repo.url,
         website: repo.website,

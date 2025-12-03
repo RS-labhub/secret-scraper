@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -32,6 +32,7 @@ export function ExportDialog({ open, onOpenChange, products, selectedProducts, o
   const [includeMetadata, setIncludeMetadata] = useState(true)
   const [includeAiEnhancements, setIncludeAiEnhancements] = useState(true)
   const [useSelectedOnly, setUseSelectedOnly] = useState(false)
+  const [approvedOnly, setApprovedOnly] = useState(true)
   const [dateRange, setDateRange] = useState<{ start?: Date; end?: Date }>({})
   const [isExporting, setIsExporting] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
@@ -121,18 +122,28 @@ export function ExportDialog({ open, onOpenChange, products, selectedProducts, o
     }
   }
 
-  const productsToExport =
-    useSelectedOnly && selectedProducts.length > 0 ? products.filter((p) => selectedProducts.includes(p.id)) : products
+  const productsToExport = useMemo(() => 
+    useSelectedOnly && selectedProducts.length > 0 ? products.filter((p) => selectedProducts.includes(p.id)) : products,
+    [useSelectedOnly, selectedProducts, products]
+  )
 
-  const filteredProducts =
+  // Filter by approval status
+  const statusFiltered = useMemo(() =>
+    approvedOnly ? productsToExport.filter(p => p.status === "approved") : productsToExport,
+    [approvedOnly, productsToExport]
+  )
+
+  const filteredProducts = useMemo(() =>
     dateRange.start || dateRange.end
-      ? productsToExport.filter((product) => {
+      ? statusFiltered.filter((product) => {
         const scrapedDate = new Date(product.scrapedAt)
         if (dateRange.start && scrapedDate < dateRange.start) return false
         if (dateRange.end && scrapedDate > dateRange.end) return false
         return true
       })
-      : productsToExport
+      : statusFiltered,
+    [dateRange.start, dateRange.end, statusFiltered]
+  )
 
   const handleExport = async () => {
     if (filteredProducts.length === 0) return
@@ -373,6 +384,21 @@ export function ExportDialog({ open, onOpenChange, products, selectedProducts, o
       // Update the products
       const allProducts = [...products]
       const productMap = new Map(allProducts.map(p => [p.id, p]))
+      const updatedProductIds = new Set(updatedProducts.map(p => p.id))
+
+      // Mark products that were in filteredProducts but not in updatedProducts as unapproved
+      filteredProducts.forEach(filteredProduct => {
+        if (!updatedProductIds.has(filteredProduct.id)) {
+          const index = allProducts.findIndex(p => p.id === filteredProduct.id)
+          if (index !== -1) {
+            allProducts[index] = { 
+              ...allProducts[index], 
+              status: "unapproved",
+              updatedAt: new Date().toISOString() 
+            }
+          }
+        }
+      })
 
       updatedProducts.forEach(updatedProduct => {
         if (updatedProduct.id && productMap.has(updatedProduct.id)) {
@@ -567,6 +593,17 @@ export function ExportDialog({ open, onOpenChange, products, selectedProducts, o
                 />
                 <Label htmlFor="ai-enhancements" className="text-sm">
                   Include AI enhancements
+                </Label>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="approved-only"
+                  checked={approvedOnly}
+                  onCheckedChange={(checked) => setApprovedOnly(!!checked)}
+                />
+                <Label htmlFor="approved-only" className="text-sm">
+                  Export approved products only
                 </Label>
               </div>
 

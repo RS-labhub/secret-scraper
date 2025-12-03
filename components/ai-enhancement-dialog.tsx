@@ -213,7 +213,7 @@ export function AIEnhancementDialog({ product, onEnhancementComplete }: AIEnhanc
                     onCheckedChange={(checked) => setTasks({ ...tasks, features: checked as boolean })}
                   />
                   <Label htmlFor="features" className="text-sm">
-                    Generate key features (3-5 points)
+                    Generate key features (2-3 points, 7-10 words each)
                   </Label>
                 </div>
               </div>

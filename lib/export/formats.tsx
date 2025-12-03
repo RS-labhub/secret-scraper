@@ -34,10 +34,9 @@ export class ProductExporter {
         forks: product.metadata?.forks,
         language: product.metadata?.language,
         license: product.metadata?.license,
-        tags: product.tags,
         domains: product.domains,
         categories: product.categories,
-        features: product.features,
+        ...(product.features && product.features.length > 0 ? { features: product.features } : {}),
         pricing: product.pricing,
         source: product.source,
         status: product.status,
@@ -45,8 +44,6 @@ export class ProductExporter {
         ...(options.includeAiEnhancements && product.aiEnhanced
           ? {
               aiSummary: product.aiEnhanced.summary,
-              features: product.aiEnhanced.highlights || product.features, // Map AI highlights to features
-              aiSuggestedTags: product.aiEnhanced.suggestedTags,
               aiSuggestedDomains: product.aiEnhanced.suggestedDomains,
               aiSuggestedCategories: product.aiEnhanced.suggestedCategories,
             }
@@ -58,10 +55,10 @@ export class ProductExporter {
   }
 
   static exportToCSV(products: any[], options: ExportOptions = { format: "csv" }) {
-    const headers = ["ID", "Name", "Description", "Logo URL", "Website URL", "Repository URL", "Product Hunt URL", "Stars", "Upvotes", "Language", "Tags", "Domains", "Categories", "Features", "Pricing", "Source", "Status", "Scraped At"]
+    const headers = ["ID", "Name", "Description", "Logo URL", "Website URL", "Repository URL", "Product Hunt URL", "Stars", "Upvotes", "Language", "Domains", "Categories", "Features", "Pricing", "Source", "Status", "Scraped At"]
 
     if (options.includeAiEnhancements) {
-      headers.push("AI Summary", "AI Suggested Tags", "AI Suggested Domains", "AI Suggested Categories")
+      headers.push("AI Summary", "AI Suggested Domains", "AI Suggested Categories")
     }
 
     const csvRows = [headers.join(",")]
@@ -78,11 +75,9 @@ export class ProductExporter {
         product.metadata?.stars || "",
         product.metadata?.upvotes || "",
         product.metadata?.language || "",
-        `"${product.tags?.join("; ") || ""}"`,
         `"${product.domains?.join("; ") || ""}"`,
         `"${product.categories?.join("; ") || ""}"`,
-        // Use AI highlights as features if available, otherwise use regular features
-        `"${(product.aiEnhanced?.highlights || product.features)?.join("; ") || ""}"`,
+        `"${product.features?.join("; ") || ""}"`,
         `"${product.pricing?.type || ""}"`,
         product.source || "",
         product.status || "",
@@ -92,7 +87,6 @@ export class ProductExporter {
       if (options.includeAiEnhancements && product.aiEnhanced) {
         row.push(
           `"${product.aiEnhanced.summary?.replace(/"/g, '""') || ""}"`,
-          `"${product.aiEnhanced.suggestedTags?.join("; ") || ""}"`,
           `"${product.aiEnhanced.suggestedDomains?.join("; ") || ""}"`,
           `"${product.aiEnhanced.suggestedCategories?.join("; ") || ""}"`,
         )
@@ -137,11 +131,6 @@ export class ProductExporter {
       xml += `      <license>${product.metadata?.license || ""}</license>\n`
       xml += `      <scrapedAt>${product.metadata?.scrapedAt || ""}</scrapedAt>\n`
       xml += `    </metadata>\n`
-      xml += `    <tags>\n`
-      product.tags?.forEach((tag: string) => {
-        xml += `      <tag><![CDATA[${tag}]]></tag>\n`
-      })
-      xml += `    </tags>\n`
       xml += `    <domains>\n`
       product.domains?.forEach((domain: string) => {
         xml += `      <domain><![CDATA[${domain}]]></domain>\n`
@@ -152,13 +141,13 @@ export class ProductExporter {
         xml += `      <category><![CDATA[${category}]]></category>\n`
       })
       xml += `    </categories>\n`
-      xml += `    <features>\n`
-      // Use AI highlights as features if available, otherwise use regular features
-      const featuresToUse = product.aiEnhanced?.highlights || product.features
-      featuresToUse?.forEach((feature: string) => {
-        xml += `      <feature><![CDATA[${feature}]]></feature>\n`
-      })
-      xml += `    </features>\n`
+      if (product.features && product.features.length > 0) {
+        xml += `    <features>\n`
+        product.features.forEach((feature: string) => {
+          xml += `      <feature><![CDATA[${feature}]]></feature>\n`
+        })
+        xml += `    </features>\n`
+      }
       xml += `    <pricing><![CDATA[${product.pricing?.type || ""}]]></pricing>\n`
       xml += `    <source>${product.source || ""}</source>\n`
       xml += `    <status>${product.status || ""}</status>\n`
@@ -166,11 +155,6 @@ export class ProductExporter {
       if (options.includeAiEnhancements && product.aiEnhanced) {
         xml += `    <aiEnhancements>\n`
         xml += `      <summary><![CDATA[${product.aiEnhanced.summary || ""}]]></summary>\n`
-        xml += `      <suggestedTags>\n`
-        product.aiEnhanced.suggestedTags?.forEach((tag: string) => {
-          xml += `        <tag><![CDATA[${tag}]]></tag>\n`
-        })
-        xml += `      </suggestedTags>\n`
         xml += `      <suggestedDomains>\n`
         product.aiEnhanced.suggestedDomains?.forEach((domain: string) => {
           xml += `        <domain><![CDATA[${domain}]]></domain>\n`
@@ -229,29 +213,19 @@ export class ProductExporter {
         markdown += `⬆️ **${product.metadata.upvotes} upvotes**\n\n`
       }
 
-      // Tags
-      if (product.tags && product.tags.length > 0) {
-        markdown += `**Tags**: ${product.tags.map((tag: string) => `\`${tag}\``).join(", ")}\n\n`
-      }
-
-      // Features - Use AI highlights as features if available, otherwise use regular features
-      const featuresToUse = product.aiEnhanced?.highlights || product.features
-      if (featuresToUse && featuresToUse.length > 0) {
+      // Features - Only show if they exist
+      if (product.features && product.features.length > 0) {
         markdown += `**Key Features**:\n`
-        featuresToUse.forEach((feature: string) => {
+        product.features.forEach((feature: string) => {
           markdown += `- ${feature}\n`
         })
         markdown += `\n`
       }
 
-      // AI Enhanced content (excluding highlights since they're now features)
+      // AI Enhanced content
       if (options.includeAiEnhancements && product.aiEnhanced) {
         if (product.aiEnhanced.summary) {
           markdown += `**AI Summary**: ${product.aiEnhanced.summary}\n\n`
-        }
-
-        if (product.aiEnhanced.suggestedTags && product.aiEnhanced.suggestedTags.length > 0) {
-          markdown += `**AI Suggested Tags**: ${product.aiEnhanced.suggestedTags.map((tag: string) => `\`${tag}\``).join(", ")}\n\n`
         }
       }
 

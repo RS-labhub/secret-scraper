@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { AIEnhancementDialog } from "./ai-enhancement-dialog"
 import { ProductEditorDialog } from "./product-editor-dialog"
 import { Trash2, Github, ExternalLink, Calendar, TrendingUp, Undo2 } from "lucide-react"
 import type { Product } from "@/types/product"
@@ -30,6 +29,10 @@ export function ProductCard({ product, onProductUpdate, onProductDelete }: Produ
         ...localProduct.aiEnhanced,
         ...enhancements,
       },
+      // Update actual features from AI highlights (2-3 features with 7-10 words each)
+      features: enhancements.highlights || localProduct.features,
+      // Update domains to only have 1 domain
+      domains: enhancements.suggestedDomains ? [enhancements.suggestedDomains[0]] : localProduct.domains,
     }
     setLocalProduct(updatedProduct)
     onProductUpdate(productId, updatedProduct)
@@ -142,10 +145,12 @@ export function ProductCard({ product, onProductUpdate, onProductDelete }: Produ
 
   // Use AI-enhanced content if available
   const displayDescription = localProduct.aiEnhanced?.summary || localProduct.description
-  // Always use the current tags (manually edited) if they exist, otherwise fall back to AI suggestions
-  const displayTags = localProduct.tags || localProduct.aiEnhanced?.suggestedTags || []
-  const displayDomains = localProduct.aiEnhanced?.suggestedDomains || localProduct.domains
+  // Ensure only 1 domain is displayed
+  const displayDomains = (localProduct.aiEnhanced?.suggestedDomains || localProduct.domains).slice(0, 1)
   const metrics = getMetricsByTimePeriod()
+  
+  // Ensure we have exactly 2-3 features
+  const displayFeatures = localProduct.features.slice(0, 3)
 
   return (
     <Card className="hover:shadow-lg transition-all duration-200 hover:scale-[1.02] overflow-hidden">
@@ -232,56 +237,32 @@ export function ProductCard({ product, onProductUpdate, onProductDelete }: Produ
           </div>
         )}
 
-        {/* AI Highlights */}
-        {localProduct.aiEnhanced?.highlights && localProduct.aiEnhanced.highlights.length > 0 && (
+        {/* Domain (only 1) */}
+        {displayDomains && displayDomains.length > 0 && (
           <div>
-            <div className="text-xs font-medium text-blue-600 dark:text-blue-400 mb-2">✨ AI Highlights</div>
+            <div className="text-xs font-medium text-muted-foreground mb-2">Domain</div>
+            <div className="flex flex-wrap gap-1 max-w-full">
+              <Badge key={displayDomains[0]} variant="secondary" className="text-xs py-0 px-2 truncate max-w-20">
+                {displayDomains[0]}
+              </Badge>
+            </div>
+          </div>
+        )}
+
+        {/* Features */}
+        {displayFeatures && displayFeatures.length > 0 && (
+          <div>
+            <div className="text-xs font-medium text-muted-foreground mb-2">Key Features</div>
             <ul className="text-xs text-muted-foreground space-y-1">
-              {localProduct.aiEnhanced.highlights.slice(0, 3).map((highlight, index) => (
-                <li key={index} className="flex items-start gap-2">
+              {displayFeatures.map((feature, index) => (
+                <li key={`feature-${index}`} className="flex items-start gap-2">
                   <span className="text-blue-500 text-[10px] mt-0.5 flex-shrink-0">•</span>
-                  <span className="line-clamp-2 break-words">{highlight}</span>
+                  <span className="line-clamp-1 break-words">{feature}</span>
                 </li>
               ))}
             </ul>
           </div>
         )}
-
-        {/* Domains */}
-        {displayDomains && displayDomains.length > 0 && (
-          <div>
-            <div className="text-xs font-medium text-muted-foreground mb-2">Domains</div>
-            <div className="flex flex-wrap gap-1 max-w-full">
-              {displayDomains.slice(0, 3).map((domain) => (
-                <Badge key={domain} variant="secondary" className="text-xs py-0 px-2 truncate max-w-20">
-                  {domain}
-                </Badge>
-              ))}
-              {displayDomains.length > 3 && (
-                <Badge variant="secondary" className="text-xs py-0 px-2 flex-shrink-0">
-                  +{displayDomains.length - 3}
-                </Badge>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Tags */}
-        <div>
-          <div className="text-xs font-medium text-muted-foreground mb-2">Tags</div>
-          <div className="flex flex-wrap gap-1 max-w-full">
-            {displayTags.slice(0, 4).map((tag) => (
-              <Badge key={tag} variant="outline" className="text-xs py-0 px-2 truncate">
-                {tag}
-              </Badge>
-            ))}
-            {displayTags.length > 4 && (
-              <Badge variant="outline" className="text-xs py-0 px-2 flex-shrink-0">
-                +{displayTags.length - 4}
-              </Badge>
-            )}
-          </div>
-        </div>
 
         {/* Actions */}
         <div className="flex items-center justify-between pt-2 border-t">
@@ -291,7 +272,6 @@ export function ProductCard({ product, onProductUpdate, onProductDelete }: Produ
             )}
           </div>
           <div className="flex gap-1">
-            <AIEnhancementDialog product={localProduct} onEnhancementComplete={handleEnhancementComplete} />
             <ProductEditorDialog product={localProduct} onProductUpdate={handleProductEdit} />
             {localProduct.status === "pending" && (
               <Button size="sm" className="text-xs px-3 py-1 h-7" onClick={() => handleApproval("approved")}>
