@@ -1,16 +1,15 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
 import {
   Select,
   SelectContent,
@@ -18,15 +17,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { AlertCircle, FileJson, Link2, Zap } from "lucide-react"
+
+import { useToast } from "@/hooks/use-toast"
+import { GitHubScraper } from "@/lib/scrapers/github-scraper"
+import { ProductHuntScraper } from "@/lib/scrapers/producthunt-scraper"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Plus, Loader2, Search, Clock, TrendingUp, Key } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Plus, Loader2, Search, Clock, TrendingUp, Key, Settings2 } from "lucide-react"
 import type { Product, ScrapeRequest } from "@/types/product"
 import { logAction } from "@/components/action-logger"
 import { storage } from "@/lib/storage"
 
-// Helper function to get ISO week number
 function getWeekNumber(date: Date): number {
   const firstDayOfYear = new Date(date.getFullYear(), 0, 1)
   const pastDaysOfYear = (date.getTime() - firstDayOfYear.getTime()) / 86400000
@@ -37,6 +43,16 @@ interface ScrapeDialogProps {
   onScrapeComplete: (products: Product[]) => void
 }
 
+const COMMON_TECH_STACKS = [
+  "1C Enterprise", "C", "C#", "C++", "CSS", "Clojure", "Common Lisp", "Crystal", "D", "Dart",
+  "Elixir", "Elm", "Emacs Lisp", "Erlang", "F#", "Fortran", "GDScript", "Go", "HCL", "Haskell",
+  "Haxe", "Java", "JavaScript", "Julia", "Jupyter Notebook", "Kotlin", "Lua", "MQL4", "MQL5",
+  "Nim", "Nix", "OCaml", "Objective-C", "PHP", "Pascal", "Perl", "PowerShell", "Prolog",
+  "PureScript", "Python", "R", "Racket", "Ruby", "Rust", "Scala", "Shell", "Solidity",
+  "Svelte", "Swift", "TeX", "Terraform", "TypeScript", "Vala", "Verilog", "Vim script", "Vue", "Zig"
+]
+const PH_SUGGESTED_TOPICS = ["ai", "developer-tools", "productivity", "design-tools", "saas", "marketing", "open-source"]
+
 export function ScrapeDialog({ onScrapeComplete }: ScrapeDialogProps) {
   const [open, setOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -45,19 +61,23 @@ export function ScrapeDialog({ onScrapeComplete }: ScrapeDialogProps) {
   const [techStack, setTechStack] = useState<string[]>([])
   const [query, setQuery] = useState("")
   const [maxLimit, setMaxLimit] = useState(20)
+  const [translateDescriptions, setTranslateDescriptions] = useState(false)
+
+  const yesterday = new Date()
+  yesterday.setDate(yesterday.getDate() - 1)
+
   const [firecrawlApiKey, setFirecrawlApiKey] = useState("")
-  // ProductHunt specific date inputs
-  const [phYear, setPhYear] = useState(new Date().getFullYear())
-  const [phMonth, setPhMonth] = useState(new Date().getMonth() + 1)
-  const [phDay, setPhDay] = useState(new Date().getDate())
-  const [phWeek, setPhWeek] = useState(getWeekNumber(new Date()))
+  const [phYear, setPhYear] = useState(yesterday.getFullYear())
+  const [phMonth, setPhMonth] = useState(yesterday.getMonth() + 1)
+  const [phDay, setPhDay] = useState(yesterday.getDate())
+  const [phWeek, setPhWeek] = useState(getWeekNumber(yesterday))
   const [phFeatured, setPhFeatured] = useState(false)
-  // New: ProductHunt scraping mode, topics, page count
+  const [phScrapeScope, setPhScrapeScope] = useState<'featured' | 'all' | 'both'>('both')
   const [phScrapeMode, setPhScrapeMode] = useState<'leaderboard' | 'products'>('leaderboard')
   const [phTopics, setPhTopics] = useState<string[]>([])
   const [phPageCount, setPhPageCount] = useState(1)
+  const [phDeepScrape, setPhDeepScrape] = useState(false)
 
-  // Load Firecrawl API key from storage on component mount
   useEffect(() => {
     const savedApiKey = storage.loadFirecrawlApiKey()
     if (savedApiKey) {
@@ -65,7 +85,6 @@ export function ScrapeDialog({ onScrapeComplete }: ScrapeDialogProps) {
     }
   }, [])
 
-  // Save Firecrawl API key to storage when it changes
   useEffect(() => {
     if (firecrawlApiKey) {
       storage.saveFirecrawlApiKey(firecrawlApiKey)
@@ -76,7 +95,6 @@ export function ScrapeDialog({ onScrapeComplete }: ScrapeDialogProps) {
     setIsLoading(true)
     logAction("info", `Starting ${source} scraping for ${timePeriod} period`)
     try {
-      // Both GitHub and ProductHunt now use the same scraping endpoint
       const scrapeRequest: ScrapeRequest = {
         source,
         filters: {
@@ -85,27 +103,25 @@ export function ScrapeDialog({ onScrapeComplete }: ScrapeDialogProps) {
           techStack: techStack.length > 0 ? techStack : undefined,
           maxLimit,
           firecrawlApiKey: firecrawlApiKey || undefined,
-          // ProductHunt specific parameters
+          ...(source === "github" && { translateDescriptions }),
           ...(source === "producthunt" && {
             phYear,
             phMonth,
             phDay,
             phWeek,
             phFeatured,
+            phScrapeScope,
             scrapeMode: phScrapeMode,
+            deepScrape: phDeepScrape,
             topics: phTopics,
             pageCount: phPageCount,
           }),
         },
       }
-      if (source === "producthunt") {
-        logAction("info", `ProductHunt scraping: mode=${phScrapeMode}, topics=[${phTopics.join(', ')}], pages=${phPageCount}`)
-      }
+      
       const response = await fetch("/api/scrape", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(scrapeRequest),
       })
       if (!response.ok) {
@@ -113,19 +129,11 @@ export function ScrapeDialog({ onScrapeComplete }: ScrapeDialogProps) {
         throw new Error(errorData.error || "Scraping failed")
       }
       const result = await response.json()
-      console.log("🔍 Scrape result received:", result)
-      console.log("🔍 Products in result:", result.products?.length || 0)
-      if (result.products?.length > 0) {
-        console.log("🔍 First product sample:", result.products[0])
-      }
       logAction("success", `Found ${result.products.length} products from ${source}`)
       onScrapeComplete(result.products)
       setOpen(false)
       setTechStack([])
       setQuery("")
-      setMaxLimit(20)
-      setPhTopics([])
-      setPhPageCount(1)
     } catch (error) {
       console.error("Scraping error:", error)
       let errorMessage = "Unknown error"
@@ -134,381 +142,296 @@ export function ScrapeDialog({ onScrapeComplete }: ScrapeDialogProps) {
       } else if (typeof error === "string") {
         errorMessage = error
       }
-      if (source === "producthunt" && errorMessage.includes("fetch")) {
-        errorMessage = "ProductHunt backend server is not running. Please start the Python backend server first."
-      }
       logAction("error", `Scraping failed: ${errorMessage}`)
     } finally {
       setIsLoading(false)
     }
   }
 
-  const addTechStack = (tech: string) => {
-    if (tech && !techStack.includes(tech)) {
-      setTechStack((prev) => [...prev, tech])
-    }
-  }
-
-  const removeTechStack = (tech: string) => {
-    setTechStack((prev) => prev.filter((t) => t !== tech))
+  const toggleTech = (tech: string) => {
+    setTechStack(prev => prev.includes(tech) ? prev.filter(t => t !== tech) : [...prev, tech])
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button className="cursor-pointer gap-2">
-          <Plus className="w-4 h-4" />
-          Scrape Products
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <Button className="btn-brutal w-full justify-center text-sm group">
+          <TrendingUp className="w-4 h-4 mr-2 group-hover:animate-pulse" />
+          Initialize Scrape
         </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <TrendingUp className="w-5 h-5" />
-            Scrape Trending Products
-          </DialogTitle>
-          <DialogDescription>
-            Scrape trending products from GitHub repositories or Product Hunt
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-6">
-          {/* Source Selection */}
-          <div className="space-y-2">
-            <Label>Source Platform</Label>
-            <Select value={source} onValueChange={(value: "github" | "producthunt") => setSource(value)}>
-              <SelectTrigger className="cursor-pointer">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="github">GitHub Trending</SelectItem>
-                <SelectItem value="producthunt">Product Hunt</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Time Period - GitHub only */}
-          {source === "github" && (
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <Clock className="w-4 h-4" />
-                Time Period
-              </Label>
-              <Select value={timePeriod} onValueChange={(value: "daily" | "weekly" | "monthly") => setTimePeriod(value)}>
-                <SelectTrigger className="cursor-pointer">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="daily">Daily Trending</SelectItem>
-                  <SelectItem value="weekly">Weekly Trending</SelectItem>
-                  <SelectItem value="monthly">Monthly Trending</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {/* Firecrawl API Key for Product Hunt */}
-          {source === "producthunt" && (
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <Key className="w-4 h-4 text-red-500" />
-                Firecrawl API Key (Required for Product Hunt)
-              </Label>
-              <Input
-                type="password"
-                placeholder="Enter your Firecrawl API key (required)..."
-                value={firecrawlApiKey}
-                onChange={(e) => setFirecrawlApiKey(e.target.value)}
-                className={!firecrawlApiKey ? "border-red-500" : ""}
-              />
-              <p className="text-xs text-muted-foreground">
-                <span className="text-red-500 font-medium">Required:</span> Firecrawl bypasses anti-bot protection for reliable Product Hunt scraping. Get your API key from{" "}
-                <a 
-                  href="https://www.firecrawl.dev" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-blue-500 hover:underline"
-                >
-                  firecrawl.dev
-                </a>
-              </p>
-              {!firecrawlApiKey && (
-                <p className="text-xs text-red-500 font-medium">
-                  ⚠️ Product Hunt scraping will fail without a Firecrawl API key
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Product Hunt Scraping Mode */}
-          {source === "producthunt" && (
-            <div className="space-y-4">
-              <Label>Product Hunt Scraping Mode</Label>
-              <Select value={phScrapeMode} onValueChange={(value: 'leaderboard' | 'products') => setPhScrapeMode(value)}>
-                <SelectTrigger className="cursor-pointer">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="leaderboard">Leaderboard (daily/weekly/monthly)</SelectItem>
-                  <SelectItem value="products">Products (by topic/tags, best rated, paginated)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {/* ProductHunt Date Selection - only for leaderboard mode */}
-          {source === "producthunt" && phScrapeMode === 'leaderboard' && (
-            <div className="space-y-4 p-4 border rounded-lg bg-muted/50">
-              <Label className="text-sm font-medium">Date Selection for ProductHunt</Label>
-              {/* ...existing code for date selection... */}
-              {/* Year input - always required */}
-              <div className="space-y-2">
-                <Label className="text-sm">Year (2013 - {new Date().getFullYear()})</Label>
-                <Input
-                  type="number"
-                  value={phYear}
-                  onChange={(e) => setPhYear(Number(e.target.value))}
-                  min={2013}
-                  max={new Date().getFullYear()}
-                  placeholder="Year"
-                />
-              </div>
-              {/* Daily inputs */}
-              {timePeriod === "daily" && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-sm">Month (1-12)</Label>
-                    <Input
-                      type="number"
-                      value={phMonth}
-                      onChange={(e) => setPhMonth(Number(e.target.value))}
-                      min={1}
-                      max={12}
-                      placeholder="Month"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm">Day (1-31)</Label>
-                    <Input
-                      type="number"
-                      value={phDay}
-                      onChange={(e) => setPhDay(Number(e.target.value))}
-                      min={1}
-                      max={31}
-                      placeholder="Day"
-                    />
-                  </div>
-                </div>
-              )}
-              {/* Weekly input */}
-              {timePeriod === "weekly" && (
-                <div className="space-y-2">
-                  <Label className="text-sm">Week Number (1-53)</Label>
-                  <Input
-                    type="number"
-                    value={phWeek}
-                    onChange={(e) => setPhWeek(Number(e.target.value))}
-                    min={1}
-                    max={53}
-                    placeholder="Week"
-                  />
-                </div>
-              )}
-              {/* Monthly input */}
-              {timePeriod === "monthly" && (
-                <div className="space-y-2">
-                  <Label className="text-sm">Month (1-12)</Label>
-                  <Input
-                    type="number"
-                    value={phMonth}
-                    onChange={(e) => setPhMonth(Number(e.target.value))}
-                    min={1}
-                    max={12}
-                    placeholder="Month"
-                  />
-                </div>
-              )}
-              {/* Featured toggle */}
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="phFeatured"
-                  checked={phFeatured}
-                  onChange={(e) => setPhFeatured(e.target.checked)}
-                  className="rounded"
-                />
-                <Label htmlFor="phFeatured" className="text-sm">
-                  Featured products only (excludes /all from URL)
-                </Label>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                URLs generated:
-                {timePeriod === "daily" && ` https://www.producthunt.com/leaderboard/daily/${phYear}/${phMonth}/${phDay}${phFeatured ? '' : '/all'}`}
-                {timePeriod === "weekly" && ` https://www.producthunt.com/leaderboard/weekly/${phYear}/${phWeek}${phFeatured ? '' : '/all'}`}
-                {timePeriod === "monthly" && ` https://www.producthunt.com/leaderboard/monthly/${phYear}/${phMonth}${phFeatured ? '' : '/all'}`}
-              </p>
-              {/* Today's date warning for daily scraping */}
-              {timePeriod === "daily" && 
-               phYear === new Date().getFullYear() && 
-               phMonth === new Date().getMonth() + 1 && 
-               phDay === new Date().getDate() && (
-                <p className="text-xs text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-950 p-2 rounded border border-yellow-200 dark:border-yellow-800">
-                  <strong>Note:</strong> You're scraping today's ProductHunt leaderboard. Products might not be listed yet as ProductHunt updates throughout the day. For better results, try scraping at the end of the day or use yesterday's date.
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Search Query - GitHub only */}
-          {source === "github" && (
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <Search className="w-4 h-4" />
-                Search Query (Optional)
-              </Label>
-              <Input
-                placeholder="Search for specific keywords..."
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-            </div>
-          )}
-
-          {/* Max Limit - GitHub only */}
-          {source === "github" && (
-            <div className="space-y-2">
-              <Label>Maximum Products</Label>
-              <Input
-                type="number"
-                value={maxLimit}
-                onChange={(e) => setMaxLimit(Number(e.target.value))}
-                min={1}
-                max={50}
-              />
-            </div>
-          )}
-
-          {/* Tech Stack (for GitHub) */}
-          {source === "github" && (
-            <div className="space-y-2">
-              <Label>Technology Stack (Optional)</Label>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="e.g., typescript, python, react..."
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      addTechStack(e.currentTarget.value)
-                      e.currentTarget.value = ""
-                    }
-                  }}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={(e) => {
-                    const input = e.currentTarget.previousElementSibling as HTMLInputElement
-                    addTechStack(input.value)
-                    input.value = ""
-                  }}
-                  className="cursor-pointer"
-                >
-                  Add
-                </Button>
-              </div>
-              {techStack.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {techStack.map((tech) => (
-                    <Badge key={tech} variant="secondary" className="cursor-pointer" onClick={() => removeTechStack(tech)}>
-                      {tech} ×
-                    </Badge>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Product Hunt Scraping Mode, Topics, and Page Count */}
-          {source === "producthunt" && (
-            <div className="space-y-4">
-              {phScrapeMode === 'products' && (
-                <div className="space-y-2">
-                  <Label>Topics/Tags (Optional, comma separated)</Label>
-                  <Input
-                    placeholder="e.g., artificial-intelligence, developer-tools, design, productivity..."
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && e.currentTarget.value) {
-                        setPhTopics([...phTopics, ...e.currentTarget.value.split(',').map(t => t.trim()).filter(Boolean)])
-                        e.currentTarget.value = ""
-                      }
-                    }}
-                  />
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {['data-analytics', 'development', 'artificial-intelligence', 'developer-tools', 'website-builder', 'open-source', 'software-engineering', 'text-editors', 'no-code', 'sdk', 'vibe-coding', 'web-app', 'tech'].map((topic) => (
-                      <Badge
-                        key={topic}
-                        variant={phTopics.includes(topic) ? "default" : "outline"}
-                        className="cursor-pointer text-xs"
-                        onClick={() => {
-                          if (phTopics.includes(topic)) {
-                            setPhTopics(phTopics.filter(t => t !== topic))
-                          } else {
-                            setPhTopics([...phTopics, topic])
-                          }
-                        }}
-                      >
-                        {topic}
-                      </Badge>
-                    ))}
-                  </div>
-                  {phTopics.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {phTopics.map((topic) => (
-                        <Badge key={topic} variant="secondary" className="cursor-pointer" onClick={() => setPhTopics(phTopics.filter(t => t !== topic))}>
-                          {topic} ×
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                  <div className="space-y-2 mt-2">
-                    <Label>Number of Pages to Scrape</Label>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={10}
-                      value={phPageCount}
-                      onChange={e => setPhPageCount(Number(e.target.value))}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
+      </SheetTrigger>
+      <SheetContent className="w-full sm:max-w-xl md:max-w-2xl bg-card border-l border-border p-0 overflow-y-auto font-sans flex flex-col gap-0 duration-300">
+        <div className="p-4 md:p-6 border-b border-border bg-card z-20 sticky top-0 z-10">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-3 font-display uppercase text-xl md:text-2xl tracking-tighter">
+              <TrendingUp className="w-5 h-5 md:w-6 md:h-6 text-primary" />
+              Scrape Protocol
+            </SheetTitle>
+            <SheetDescription className="font-mono text-[10px] md:text-xs uppercase tracking-widest text-muted-foreground">
+              Configure parameters to extract intelligence.
+            </SheetDescription>
+          </SheetHeader>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)} className="cursor-pointer">
-            Cancel
-          </Button>
-          <Button 
-            onClick={handleScrape} 
+        <div className="p-4 md:p-6 space-y-6 md:space-y-8 flex-1 overflow-y-auto">
+          {/* Source Selection - Big UI */}
+          <div className="space-y-4">
+            <Label className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Target Vector</Label>
+            <div className="grid grid-cols-2 gap-3 md:gap-4">
+              <button
+                onClick={() => setSource("github")}
+                className={`p-3 md:p-4 border text-left flex flex-col gap-1.5 md:gap-2 transition-all ${source === "github" ? "border-primary bg-primary/10" : "border-border hover:border-muted-foreground"}`}
+              >
+                <span className="font-bold uppercase tracking-tight text-sm md:text-base">GitHub</span>
+                <span className="text-[10px] md:text-xs text-muted-foreground">Trending repos & developers</span>
+              </button>
+              <button
+                onClick={() => setSource("producthunt")}
+                className={`p-3 md:p-4 border text-left flex flex-col gap-1.5 md:gap-2 transition-all ${source === "producthunt" ? "border-primary bg-primary/10" : "border-border hover:border-muted-foreground"}`}
+              >
+                <span className="font-bold uppercase tracking-tight text-sm md:text-base">Product Hunt</span>
+                <span className="text-[10px] md:text-xs text-muted-foreground">Daily launches & startups</span>
+              </button>
+            </div>
+          </div>
+
+          <Tabs defaultValue="basic" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 bg-secondary rounded-none h-12 p-1">
+              <TabsTrigger value="basic" className="rounded-none font-mono uppercase text-xs data-[state=active]:bg-background data-[state=active]:text-foreground">Basic Config</TabsTrigger>
+              <TabsTrigger value="advanced" className="rounded-none font-mono uppercase text-xs data-[state=active]:bg-background data-[state=active]:text-foreground">Advanced <Settings2 className="w-3 h-3 ml-2"/></TabsTrigger>
+            </TabsList>
+            
+            <div className="mt-4 md:mt-6 border border-border p-4 md:p-6 bg-secondary/10">
+              <TabsContent value="basic" className="space-y-6 m-0">
+                {source === "github" && (
+                  <div className="space-y-6">
+                    <div className="space-y-3">
+                      <Label className="font-mono text-xs uppercase text-muted-foreground">Time Horizon</Label>
+                      <Select value={timePeriod} onValueChange={(v: any) => setTimePeriod(v)}>
+                        <SelectTrigger className="rounded-none border-border h-12 font-mono">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-none border-border">
+                          <SelectItem value="daily" className="font-mono">Daily Trending</SelectItem>
+                          <SelectItem value="weekly" className="font-mono">Weekly Trending</SelectItem>
+                          <SelectItem value="monthly" className="font-mono">Monthly Trending</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-3">
+                      <Label className="font-mono text-xs uppercase text-muted-foreground">Tech Stack Interest (Optional)</Label>
+                      <ScrollArea className="h-48 border border-border p-2">
+                        <div className="flex flex-wrap gap-2">
+                          {COMMON_TECH_STACKS.map(tech => (
+                            <Badge
+                              key={tech}
+                              variant={techStack.includes(tech) ? "default" : "outline"}
+                              className="cursor-pointer rounded-none border-border hover:bg-primary/20"
+                              onClick={() => toggleTech(tech)}
+                            >
+                              {tech}
+                            </Badge>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    </div>
+                  </div>
+                )}
+                
+                {source === "producthunt" && (
+                  <div className="space-y-6">
+                    <div className="space-y-3">
+                      <Label className="font-mono text-xs uppercase text-muted-foreground flex items-center gap-2">
+                        <Key className="w-3 h-3 text-primary" /> Firecrawl Authentication
+                      </Label>
+                      <Input
+                        type="password"
+                        placeholder="sk-fc-..."
+                        value={firecrawlApiKey}
+                        onChange={(e) => setFirecrawlApiKey(e.target.value)}
+                        className={`rounded-none border-border h-12 font-mono ${!firecrawlApiKey ? "border-destructive/50 focus-visible:ring-destructive" : ""}`}
+                      />
+                      {!firecrawlApiKey && <p className="text-xs text-destructive font-mono">Required for bypass protocol.</p>}
+                    </div>
+
+                    <div className="space-y-3">
+                      <Label className="font-mono text-xs uppercase text-muted-foreground">Scrape Mode</Label>
+                      <Select value={phScrapeMode} onValueChange={(v: any) => setPhScrapeMode(v)}>
+                        <SelectTrigger className="rounded-none border-border h-12 font-mono">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-none">
+                          <SelectItem value="leaderboard">Leaderboard (Time-based)</SelectItem>
+                          <SelectItem value="products">Topic/Tag Search</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {phScrapeMode === 'products' && (
+                      <div className="space-y-4 pt-2 border-t border-border/50">
+                        <Label className="font-mono text-xs uppercase text-muted-foreground">Topics / Tags</Label>
+                        <Input
+                          placeholder="Type or select a topic and press Enter..."
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && e.currentTarget.value) {
+                              const newTopics = e.currentTarget.value.split(',').map(t => t.trim().toLowerCase()).filter(Boolean)
+                              setPhTopics(prev => [...new Set([...prev, ...newTopics])])
+                              e.currentTarget.value = ""
+                            }
+                          }}
+                          className="rounded-none border-border h-10 font-mono"
+                        />
+
+                        <div className="flex flex-wrap gap-2">
+                          {phTopics.map(topic => (
+                            <Badge key={topic} variant="default" className="cursor-pointer rounded-none border border-primary hover:bg-destructive" onClick={() => setPhTopics(phTopics.filter(t => t !== topic))}>{topic} ×</Badge>
+                          ))}
+                        </div>
+
+                        <div className="pt-2">
+                          <Label className="font-mono text-[10px] uppercase text-muted-foreground mb-2 block">Suggestions</Label>
+                          <div className="flex flex-wrap gap-2">
+                            {PH_SUGGESTED_TOPICS.map(topic => (
+                              <Badge
+                                key={topic}
+                                variant="outline"
+                                className="cursor-pointer rounded-none border-border hover:bg-primary/20 text-xs"
+                                onClick={() => !phTopics.includes(topic) && setPhTopics([...phTopics, topic])}
+                              >
+                                + {topic}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {phScrapeMode === 'leaderboard' && (
+                      <div className="space-y-4 pt-2 border-t border-border/50">
+                        <Label className="font-mono text-xs uppercase text-muted-foreground">Time Parameters</Label>
+                        <div className="grid grid-cols-3 gap-4">
+                           <div className="space-y-2">
+                             <Label className="text-xs font-mono">Year</Label>
+                             <Input type="number" value={phYear} onChange={e => setPhYear(Number(e.target.value))} className="rounded-none border-border" />
+                           </div>
+                           <div className="space-y-2">
+                             <Label className="text-xs font-mono">Month</Label>
+                             <Input type="number" min={1} max={12} value={phMonth} onChange={e => setPhMonth(Number(e.target.value))} className="rounded-none border-border" />
+                           </div>
+                           <div className="space-y-2">
+                             <Label className="text-xs font-mono">Day</Label>
+                             <Input type="number" min={1} max={31} value={phDay} onChange={e => setPhDay(Number(e.target.value))} className="rounded-none border-border" />
+                           </div>
+                        </div>
+
+                        <div className="space-y-3 pt-3">
+                          <Label className="font-mono text-xs uppercase text-muted-foreground">Scrape Scope</Label>
+                          <div className="grid grid-cols-3 gap-3">
+                            <button
+                              onClick={() => setPhScrapeScope("featured")}
+                              className={`p-3 border text-center text-xs font-mono uppercase transition-all ${phScrapeScope === "featured" ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-muted-foreground text-muted-foreground"}`}
+                            >
+                              Featured
+                            </button>
+                            <button
+                              onClick={() => setPhScrapeScope("all")}
+                              className={`p-3 border text-center text-xs font-mono uppercase transition-all ${phScrapeScope === "all" ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-muted-foreground text-muted-foreground"}`}
+                            >
+                              All
+                            </button>
+                            <button
+                              onClick={() => setPhScrapeScope("both")}
+                              className={`p-3 border text-center text-xs font-mono uppercase transition-all ${phScrapeScope === "both" ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-muted-foreground text-muted-foreground"}`}
+                            >
+                              Both
+                            </button>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground font-mono">
+                            {phScrapeScope === 'featured' && 'Scrape only featured/top products from the leaderboard.'}
+                            {phScrapeScope === 'all' && 'Scrape all products from the leaderboard.'}
+                            {phScrapeScope === 'both' && 'Scrape both featured and all products. Featured products will be labeled.'}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="advanced" className="space-y-6 m-0">
+                {source === "github" && (
+                  <div className="space-y-6">
+                    <div className="space-y-3">
+                      <Label className="font-mono text-xs uppercase text-muted-foreground">Free-Text Query</Label>
+                      <Input
+                        placeholder="Specific repository names or keywords..."
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        className="rounded-none border-border font-mono h-10"
+                      />
+                    </div>
+                    <div className="space-y-3 flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label className="font-mono text-xs uppercase text-muted-foreground">Translate Descriptions</Label>
+                        <p className="text-xs text-muted-foreground">Auto-translate foreign repo descriptions to English.</p>
+                      </div>
+                      <Switch checked={translateDescriptions} onCheckedChange={setTranslateDescriptions} />
+                    </div>
+                    <div className="space-y-3 flex items-center justify-between">
+                      <Label className="font-mono text-xs uppercase text-muted-foreground">Max Yield</Label>
+                      <Input
+                        type="number"
+                        value={maxLimit}
+                        onChange={(e) => setMaxLimit(Number(e.target.value))}
+                        min={1} max={100}
+                        className="rounded-none border-border font-mono w-24 h-10"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {source === "producthunt" && (
+                  <div className="space-y-6">
+                    <div className="space-y-3 flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label className="font-mono text-xs uppercase text-muted-foreground text-primary">Deep Extraction</Label>
+                        <p className="text-[10px] text-muted-foreground max-w-[200px] leading-tight">Scrapes individual product pages to extract explicit website URLs & social handles. (Slower)</p>
+                      </div>
+                      <Switch checked={phDeepScrape} onCheckedChange={setPhDeepScrape} />
+                    </div>
+
+                    {phScrapeMode === 'products' && (
+                      <div className="space-y-4">
+                        <Label className="font-mono text-xs uppercase text-muted-foreground">Result Depth</Label>
+                        <div className="space-y-2 flex items-center justify-between">
+                          <span className="text-xs font-mono text-muted-foreground">Pages to scrape</span>
+                          <Input type="number" min={1} max={5} value={phPageCount} onChange={e => setPhPageCount(Number(e.target.value))} className="rounded-none border-border w-24 h-8" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </TabsContent>
+            </div>
+          </Tabs>
+        </div>
+
+        <div className="p-4 md:p-6 border-t border-border bg-black sticky bottom-0">
+          <Button
+            onClick={handleScrape}
             disabled={isLoading || (source === "producthunt" && !firecrawlApiKey)}
-            className="cursor-pointer"
+            className="w-full btn-brutal h-12 md:h-14 text-sm md:text-lg"
           >
             {isLoading ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Scraping...
-              </>
+              <><Loader2 className="w-5 h-5 mr-3 animate-spin" /> Executing...</>
             ) : (
-              <>
-                <Plus className="w-4 h-4 mr-2" />
-                {source === "producthunt" && !firecrawlApiKey ? "Firecrawl API Key Required" : "Start Scraping"}
-              </>
+              <><Zap className="w-5 h-5 mr-3" /> Execute Scrape Sequence</>
             )}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </SheetContent>
+    </Sheet>
   )
 }
+

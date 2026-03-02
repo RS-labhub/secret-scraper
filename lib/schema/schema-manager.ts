@@ -292,6 +292,7 @@ export class SchemaManager {
       { path: 'links.productHunt', label: 'ProductHunt URL', type: 'string' },
       { path: 'links.documentation', label: 'Documentation URL', type: 'string' },
       { path: 'links.demo', label: 'Demo URL', type: 'string' },
+      { path: 'links.social', label: 'Social Handles', type: 'array' },
       
       // Metadata
       { path: 'metadata.stars', label: 'Stars Count', type: 'number' },

@@ -4,6 +4,7 @@ import { JetBrains_Mono } from "next/font/google"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
+import { GuidedTourSheet } from "@/components/guided-tour-sheet"
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
@@ -68,6 +69,7 @@ export default function RootLayout({
             const Footer = require("@/components/footer").Footer;
             return <Footer />;
           })()}
+          <GuidedTourSheet />
         </ThemeProvider>
       </body>
     </html>

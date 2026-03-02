@@ -1,4 +1,4 @@
-import { Github, Linkedin, Twitter, Mail, ZapOff, User } from "lucide-react"
+﻿import { Github, Linkedin, Twitter, Mail, ZapOff, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 export function Footer() {
@@ -40,7 +40,7 @@ export function Footer() {
               className="gap-2 text-muted-foreground hover:text-foreground"
             >
               <a
-                href="https://github.com/RS-labhub"
+                href="https://github.com/RS-labhub/secret-scraper"
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="GitHub Profile"
@@ -104,3 +104,4 @@ export function Footer() {
     </footer>
   )
 }
+

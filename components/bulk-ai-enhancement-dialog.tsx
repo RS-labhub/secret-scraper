@@ -1,15 +1,14 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
@@ -69,7 +68,6 @@ export function BulkAIEnhancementDialog({
     setResults({ success: [], failed: [] })
 
     logAction("info", `Starting bulk AI enhancement for ${totalToEnhance} products using ${aiService.provider}`)
-
     const updatedProducts = [...products]
     let completed = 0
     let failed = 0
@@ -79,7 +77,7 @@ export function BulkAIEnhancementDialog({
     for (let i = 0; i < unenhancedProducts.length; i++) {
       const product = unenhancedProducts[i]
       setCurrentProduct(product.name)
-      
+
       try {
         const response = await fetch("/api/ai/enhance", {
           method: "POST",
@@ -103,7 +101,7 @@ export function BulkAIEnhancementDialog({
         if (response.ok) {
           const result = await response.json()
           const enhancement = result.enhancements
-          
+
           // Find and update the product in the array
           const productIndex = updatedProducts.findIndex(p => p.id === product.id)
           if (productIndex !== -1) {
@@ -115,7 +113,7 @@ export function BulkAIEnhancementDialog({
               aiEnhanced: enhancement,
             }
           }
-          
+
           completed++
           successList.push(product.name)
           logAction("success", `Enhanced: ${product.name}`)
@@ -144,10 +142,10 @@ export function BulkAIEnhancementDialog({
 
     // Update the products in the parent component
     onProductsUpdated(updatedProducts)
-    
+
     setIsProcessing(false)
     setCurrentProduct("")
-    
+
     logAction("info", `Bulk enhancement completed: ${completed} success, ${failed} failed`)
   }
 
@@ -166,64 +164,66 @@ export function BulkAIEnhancementDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-purple-500" />
-            Bulk AI Enhancement
-          </DialogTitle>
-          <DialogDescription>
-            Enhance multiple products with AI-generated summaries, highlights, and tags.
-          </DialogDescription>
-        </DialogHeader>
+    <Sheet open={open} onOpenChange={handleClose}>
+      <SheetContent className="w-full sm:max-w-md bg-card border-l border-border p-0 overflow-y-auto font-sans flex flex-col gap-0 duration-300">
+        <div className="p-6 border-b border-border bg-card z-20 sticky top-0 z-10">
+          <SheetHeader>
+            <SheetTitle className="font-display uppercase text-2xl tracking-tighter flex items-center gap-2">
+              <Sparkles className="h-6 w-6 text-primary" />
+              Batch Matrix Inference
+            </SheetTitle>
+            <SheetDescription className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+              Execute bulk transformation routines across datastore.
+            </SheetDescription>
+          </SheetHeader>
+        </div>
 
-        <div className="space-y-4">
+        <div className="p-6 flex-1 space-y-6">
           {!aiService ? (
-            <Alert>
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
-                No AI service configured. Please configure an AI service in the AI Manager first.
+            <Alert className="rounded-none border-destructive bg-destructive/10">
+              <AlertTriangle className="h-4 w-4 text-destructive" />
+              <AlertDescription className="font-mono text-xs text-destructive">
+                SYSTEM ERROR: No AI core parameters detected. Configure services subsystem before execution.
               </AlertDescription>
             </Alert>
           ) : totalToEnhance === 0 ? (
-            <Alert>
-              <CheckCircle className="h-4 w-4" />
-              <AlertDescription>
-                All products have already been AI enhanced!
+            <Alert className="rounded-none border-primary bg-primary/10">
+              <CheckCircle className="h-4 w-4 text-primary" />
+              <AlertDescription className="font-mono text-xs text-primary">
+                STATUS: Optimal. All records presently augmented.
               </AlertDescription>
             </Alert>
           ) : (
             <>
-              <Alert>
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>
-                  This will enhance {totalToEnhance} products using {aiService.provider}. The process may take several minutes.
+              <Alert className="rounded-none border-border bg-secondary/10">
+                <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                <AlertDescription className="font-mono text-xs text-muted-foreground">
+                  TARGET LOCK: {totalToEnhance} unformatted entries found. Utilizing {aiService.provider.toUpperCase()} engine. Operation will command heavy throughput.
                 </AlertDescription>
               </Alert>
 
               {isProcessing && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span>Progress</span>
-                    <span>{Math.round(progress)}%</span>
+                <div className="space-y-4 border border-border p-4 bg-background">
+                  <div className="flex items-center justify-between font-mono text-xs uppercase">
+                    <span className="text-muted-foreground">Process Progress</span>
+                    <span className="text-primary">{Math.round(progress)}%</span>
                   </div>
-                  <Progress value={progress} className="w-full" />
-                  
+                  <Progress value={progress} className="w-full h-2 rounded-none bg-secondary [&>div]:bg-primary" />
+
                   {currentProduct && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Clock className="h-4 w-4" />
-                      Processing: {currentProduct}
+                    <div className="flex items-center gap-2 font-mono text-xs text-muted-foreground border-t border-border pt-4">
+                      <Clock className="h-3 w-3 animate-spin" />
+                      <span className="truncate">PROCESSING: {currentProduct}</span>
                     </div>
                   )}
 
                   <div className="flex gap-2">
-                    <Badge variant="outline" className="text-green-600">
-                      ✓ {completedCount} completed
+                    <Badge variant="outline" className="rounded-none border-primary text-primary font-mono text-[10px]">
+                      [SUCCESS: {completedCount}]
                     </Badge>
                     {failedCount > 0 && (
-                      <Badge variant="outline" className="text-red-600">
-                        ✗ {failedCount} failed
+                      <Badge variant="outline" className="rounded-none border-destructive text-destructive font-mono text-[10px]">
+                        [FAILURE: {failedCount}]
                       </Badge>
                     )}
                   </div>
@@ -231,23 +231,24 @@ export function BulkAIEnhancementDialog({
               )}
 
               {!isProcessing && (completedCount > 0 || failedCount > 0) && (
-                <div className="space-y-2">
-                  <div className="text-sm font-medium">Results:</div>
+                <div className="space-y-4 border border-border p-4 bg-background">
+                  <div className="font-mono text-xs uppercase text-muted-foreground border-b border-border pb-2">Telemetry Results:</div>
+                  
                   {results.success.length > 0 && (
-                    <div className="text-sm">
-                      <span className="text-green-600 font-medium">✓ Enhanced ({results.success.length}):</span>
-                      <div className="text-muted-foreground ml-4">
+                    <div className="space-y-2">
+                      <span className="font-mono text-[10px] text-primary uppercase">[+] Success Array ({results.success.length} items):</span>
+                      <div className="font-mono text-xs text-muted-foreground ml-4 break-words bg-secondary/30 p-2 border-l border-primary/50">
                         {results.success.slice(0, 3).join(", ")}
-                        {results.success.length > 3 && ` and ${results.success.length - 3} more...`}
+                        {results.success.length > 3 && ` ... +${results.success.length - 3} additional nodes`}
                       </div>
                     </div>
                   )}
                   {results.failed.length > 0 && (
-                    <div className="text-sm">
-                      <span className="text-red-600 font-medium">✗ Failed ({results.failed.length}):</span>
-                      <div className="text-muted-foreground ml-4">
+                    <div className="space-y-2">
+                      <span className="font-mono text-[10px] text-destructive uppercase">[-] Failure Array ({results.failed.length} items):</span>
+                      <div className="font-mono text-xs text-destructive/80 ml-4 break-words bg-destructive/10 p-2 border-l border-destructive/50">
                         {results.failed.slice(0, 3).join(", ")}
-                        {results.failed.length > 3 && ` and ${results.failed.length - 3} more...`}
+                        {results.failed.length > 3 && ` ... +${results.failed.length - 3} additional nodes`}
                       </div>
                     </div>
                   )}
@@ -257,18 +258,18 @@ export function BulkAIEnhancementDialog({
           )}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={handleClose} disabled={isProcessing}>
-            {isProcessing ? "Processing..." : "Close"}
+        <div className="p-6 border-t border-border bg-black sticky bottom-0 flex gap-4 mt-auto">
+          <Button variant="outline" onClick={handleClose} disabled={isProcessing} className="flex-1 rounded-none font-mono uppercase h-14">
+            {isProcessing ? "LOCKED" : "ABORT"}
           </Button>
           {aiService && totalToEnhance > 0 && !isProcessing && (
-            <Button onClick={handleBulkEnhancement}>
-              <Sparkles className="h-4 w-4 mr-2" />
-              Enhance All ({totalToEnhance})
+            <Button onClick={handleBulkEnhancement} className="flex-1 btn-brutal h-14 text-xs">
+              <Sparkles className="h-4 w-4 mr-2" /> EXECUTE ({totalToEnhance})
             </Button>
           )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </SheetContent>
+    </Sheet>
   )
 }
+

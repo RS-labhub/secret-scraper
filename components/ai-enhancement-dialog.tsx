@@ -1,14 +1,14 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect } from "react"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
 import { loadFromStorage } from "@/lib/storage"
 import type { AIServiceConfig } from "@/types/product"
 import { Button } from "@/components/ui/button"
@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, Sparkles } from "lucide-react"
+import { Loader2, Sparkles, BrainCircuit, Scan } from "lucide-react"
 import type { Product } from "@/types/product"
 
 interface AIEnhancementDialogProps {
@@ -29,16 +29,12 @@ export function AIEnhancementDialog({ product, onEnhancementComplete }: AIEnhanc
   const [loading, setLoading] = useState(false)
   const [provider, setProvider] = useState("groq")
   const [apiKey, setApiKey] = useState("")
-  const [showApiKey, setShowApiKey] = useState(false)
   const [aiServices, setAiServices] = useState<AIServiceConfig[]>([])
   
-  // Load AI services configuration
   useEffect(() => {
     const savedServices = loadFromStorage<AIServiceConfig[]>("aiServices", [])
     if (savedServices.length > 0) {
       setAiServices(savedServices)
-      
-      // Set default provider to the first enabled service
       const enabledService = savedServices.find(s => s.enabled)
       if (enabledService) {
         setProvider(enabledService.provider)
@@ -46,15 +42,15 @@ export function AIEnhancementDialog({ product, onEnhancementComplete }: AIEnhanc
       }
     }
   }, [])
+  
   const [tasks, setTasks] = useState({
     summarize: true,
     highlights: true,
     domain: true,
-    features: true, // Add features generation task
+    features: true,
   })
   const [preview, setPreview] = useState<any>(null)
 
-  // Build providers list from AI services configuration
   const providers = [
     { id: "groq", name: "Groq", requiresKey: false },
     { id: "gemini", name: "Gemini", requiresKey: false },
@@ -62,22 +58,20 @@ export function AIEnhancementDialog({ product, onEnhancementComplete }: AIEnhanc
     { id: "anthropic", name: "Anthropic", requiresKey: true },
   ]
 
-  // Find selected provider, preferring the version from aiServices if available
-  const selectedProvider = aiServices.find(s => s.provider === provider) 
-    ? { 
-        id: provider, 
-        name: providers.find(p => p.id === provider)?.name || provider, 
-        requiresKey: provider === "openai" || provider === "anthropic" 
+  const selectedProvider = aiServices.find(s => s.provider === provider)
+    ? {
+        id: provider,
+        name: providers.find(p => p.id === provider)?.name || provider,
+        requiresKey: provider === "openai" || provider === "anthropic"
       }
     : providers.find((p) => p.id === provider)
 
   const handleEnhance = async () => {
-    // Use API key from services if available
     const serviceConfig = aiServices.find(s => s.provider === provider)
     const currentApiKey = serviceConfig?.apiKey || apiKey
-    
+
     if (selectedProvider?.requiresKey && !currentApiKey.trim()) {
-      alert("Please enter your API key or configure it in AI Services")
+      alert("SYS_HALT: MISSING_AUTH_VECTOR. Configure API Key.")
       return
     }
 
@@ -89,7 +83,7 @@ export function AIEnhancementDialog({ product, onEnhancementComplete }: AIEnhanc
         .map(([task, _]) => task)
 
       if (selectedTasks.length === 0) {
-        alert("Please select at least one enhancement task")
+        alert("SYS_HALT: NO_MUTATION_TASKS_SELECTED")
         return
       }
 
@@ -113,14 +107,14 @@ export function AIEnhancementDialog({ product, onEnhancementComplete }: AIEnhanc
 
       if (!response.ok) {
         const error = await response.json()
-        throw new Error(error.error || "Enhancement failed")
+        throw new Error(error.error || "MIND_MERGE_FAILED")
       }
 
       const result = await response.json()
       setPreview(result.enhancements)
     } catch (error) {
       console.error("Enhancement error:", error)
-      alert(error instanceof Error ? error.message : "Enhancement failed")
+      alert(error instanceof Error ? error.message : "MIND_MERGE_FAILED")
     } finally {
       setLoading(false)
     }
@@ -135,133 +129,108 @@ export function AIEnhancementDialog({ product, onEnhancementComplete }: AIEnhanc
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm" variant="outline" className="text-xs px-2 py-1 bg-transparent">
-          <Sparkles className="w-3 h-3 mr-1" />
-          Enhance
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <Button size="sm" variant="outline" className="font-mono text-[9px] uppercase px-2 py-1 rounded-none border-primary text-primary hover:bg-primary hover:text-black">
+          <BrainCircuit className="w-3 h-3 mr-1" />
+          MIND_MERGE
         </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="font-serif font-bold flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-accent" />
-            AI Enhancement
-          </DialogTitle>
-          <DialogDescription>
-            Use AI to enhance "{product.name}" with better descriptions, highlights, and domain suggestions.
-          </DialogDescription>
-        </DialogHeader>
+      </SheetTrigger>
+      <SheetContent className="w-full sm:max-w-xl bg-card border-l border-border p-0 overflow-y-auto font-sans flex flex-col gap-0 duration-300">
+        <div className="p-6 border-b border-border bg-card z-20 sticky top-0 z-10">
+          <SheetHeader>
+            <SheetTitle className="font-display uppercase text-2xl tracking-tighter flex items-center gap-2">
+              <BrainCircuit className="h-6 w-6 text-primary" />
+              Intelligence Vector
+            </SheetTitle>
+            <SheetDescription className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+              Execute neural enhancements on "{product.name}".
+            </SheetDescription>
+          </SheetHeader>
+        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Configuration */}
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>AI Provider</Label>
-              <Select value={provider} onValueChange={setProvider}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {providers.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-3">
-              <Label>Enhancement Tasks</Label>
+        <div className="p-6 flex-1 space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Configuration */}
+            <div className="space-y-6">
               <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="summarize"
-                    checked={tasks.summarize}
-                    onCheckedChange={(checked) => setTasks({ ...tasks, summarize: checked as boolean })}
-                  />
-                  <Label htmlFor="summarize" className="text-sm">
-                    Generate compelling summary
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="highlights"
-                    checked={tasks.highlights}
-                    onCheckedChange={(checked) => setTasks({ ...tasks, highlights: checked as boolean })}
-                  />
-                  <Label htmlFor="highlights" className="text-sm">
-                    Extract feature highlights
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="features"
-                    checked={tasks.features}
-                    onCheckedChange={(checked) => setTasks({ ...tasks, features: checked as boolean })}
-                  />
-                  <Label htmlFor="features" className="text-sm">
-                    Generate key features (2-3 points, 7-10 words each)
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="domain"
-                    checked={tasks.domain}
-                    onCheckedChange={(checked) => setTasks({ ...tasks, domain: checked as boolean })}
-                  />
-                  <Label htmlFor="domain" className="text-sm">
-                    Recommend the best domain
-                  </Label>
+                <Label className="font-mono text-xs text-primary uppercase border-b border-primary/20 pb-2 flex w-full">Neural_Core</Label>
+                <Select value={provider} onValueChange={setProvider}>
+                  <SelectTrigger className="rounded-none border-border font-mono text-[10px] uppercase bg-black h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-none border-border font-mono text-[10px]">
+                    {providers.map((p) => (
+                      <SelectItem key={p.id} value={p.id} className="uppercase">
+                        SYS_{p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-3">
+                <Label className="font-mono text-xs uppercase text-muted-foreground block mb-4">Mutation_Directives</Label>
+                <div className="space-y-3 font-mono text-[10px] uppercase">
+                  <div className="flex items-start space-x-3 p-2 border border-border/50 bg-secondary/10">
+                    <Checkbox id="summarize" checked={tasks.summarize} onCheckedChange={(c) => setTasks({ ...tasks, summarize: c as boolean })} className="mt-0.5 rounded-none data-[state=checked]:bg-primary data-[state=checked]:text-black border-border" />
+                    <Label htmlFor="summarize" className="leading-tight">Synthesize Context Matrix</Label>
+                  </div>
+                  <div className="flex items-start space-x-3 p-2 border border-border/50 bg-secondary/10">
+                    <Checkbox id="highlights" checked={tasks.highlights} onCheckedChange={(c) => setTasks({ ...tasks, highlights: c as boolean })} className="mt-0.5 rounded-none data-[state=checked]:bg-primary data-[state=checked]:text-black border-border" />
+                    <Label htmlFor="highlights" className="leading-tight">Extract Primary Nodes</Label>
+                  </div>
+                  <div className="flex items-start space-x-3 p-2 border border-border/50 bg-secondary/10">
+                    <Checkbox id="features" checked={tasks.features} onCheckedChange={(c) => setTasks({ ...tasks, features: c as boolean })} className="mt-0.5 rounded-none data-[state=checked]:bg-primary data-[state=checked]:text-black border-border" />
+                    <Label htmlFor="features" className="leading-tight">Auto-Generate Features</Label>
+                  </div>
+                  <div className="flex items-start space-x-3 p-2 border border-border/50 bg-secondary/10">
+                    <Checkbox id="domain" checked={tasks.domain} onCheckedChange={(c) => setTasks({ ...tasks, domain: c as boolean })} className="mt-0.5 rounded-none data-[state=checked]:bg-primary data-[state=checked]:text-black border-border" />
+                    <Label htmlFor="domain" className="leading-tight">Optimize TLD Routing</Label>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="flex gap-2">
-              <Button onClick={handleEnhance} disabled={loading} className="flex-1">
-                {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                {loading ? "Enhancing..." : "Enhance with AI"}
+              <Button onClick={handleEnhance} disabled={loading} variant="outline" className="w-full rounded-none border-primary text-primary hover:bg-primary/20 font-mono text-[10px] uppercase h-10">
+                {loading ? <><Scan className="w-3 h-3 mr-2 animate-spin" /> ESTABLISHING_LINK...</> : <><Sparkles className="w-3 h-3 mr-2" /> INITIALIZE_INFERENCE</>}
               </Button>
             </div>
-          </div>
 
-          {/* Preview */}
-          <div className="space-y-4">
-            <div>
-              <Label className="text-sm font-medium">Current Product</Label>
-              <div className="mt-2 p-3 bg-muted rounded-lg">
-                <h4 className="font-medium">{product.name}</h4>
-                <p className="text-sm text-muted-foreground mt-1">{product.description}</p>
-                {product.domain && (
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    <Badge variant="outline" className="text-xs">
-                      Domain: {product.domain}
+            {/* Preview */}
+            <div className="space-y-4">
+              <div className="border border-border bg-black p-4">
+                <Label className="font-mono text-[10px] uppercase text-muted-foreground border-b border-border pb-1 block mb-3">Origin_State</Label>
+                <div className="space-y-2 font-mono">
+                  <h4 className="text-xs text-primary truncate">{product.name}</h4>
+                  <p className="text-[9px] text-muted-foreground line-clamp-4">{product.description}</p>
+                  {product.domain && (
+                    <Badge variant="outline" className="rounded-none border-border px-1 py-0 text-[8px] bg-secondary/30 mt-2">
+                      DOM: {product.domain}
                     </Badge>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
 
-            {preview && (
-              <div>
-                <Label className="text-sm font-medium">AI Enhancements</Label>
-                <div className="mt-2 space-y-3">
+              {preview && (
+                <div className="border border-primary bg-primary/5 p-4 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  <Label className="font-mono text-xs uppercase text-primary border-b border-primary/30 pb-1 flex justify-between items-center mb-3">
+                    Mutated_State <span className="text-[9px] text-primary/50">MEM_READY</span>
+                  </Label>
+                  
                   {preview.summary && (
-                    <div className="p-3 bg-accent/10 border border-accent/20 rounded-lg">
-                      <Label className="text-xs font-medium text-accent">Enhanced Summary</Label>
-                      <p className="text-sm mt-1">{preview.summary}</p>
+                    <div className="space-y-1">
+                      <Label className="font-mono text-[8px] uppercase text-primary/70">Context_Matrix</Label>
+                      <p className="font-mono text-[9px] bg-black border border-primary/20 p-2">{preview.summary}</p>
                     </div>
                   )}
 
                   {preview.highlights && (
-                    <div className="p-3 bg-secondary/10 border border-secondary/20 rounded-lg">
-                      <Label className="text-xs font-medium text-secondary">Feature Highlights</Label>
-                      <ul className="text-sm mt-1 space-y-1">
-                        {preview.highlights.map((highlight: string, index: number) => (
-                          <li key={index} className="flex items-start gap-2">
-                            <span className="text-secondary">•</span>
-                            {highlight}
+                    <div className="space-y-1">
+                      <Label className="font-mono text-[8px] uppercase text-primary/70">Primary_Nodes</Label>
+                      <ul className="font-mono text-[9px] space-y-1 bg-black border border-primary/20 p-2">
+                        {preview.highlights.map((h: string, i: number) => (
+                          <li key={i} className="flex items-start gap-2 text-primary">
+                            <span className="opacity-50">&gt;</span> <span className="text-foreground">{h}</span>
                           </li>
                         ))}
                       </ul>
@@ -269,13 +238,12 @@ export function AIEnhancementDialog({ product, onEnhancementComplete }: AIEnhanc
                   )}
 
                   {preview.features && (
-                    <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-                      <Label className="text-xs font-medium text-green-600">Generated Features</Label>
-                      <ul className="text-sm mt-1 space-y-1">
-                        {preview.features.map((feature: string, index: number) => (
-                          <li key={index} className="flex items-start gap-2">
-                            <span className="text-green-600">•</span>
-                            {feature}
+                    <div className="space-y-1">
+                      <Label className="font-mono text-[8px] uppercase text-primary/70">Inferred_Features</Label>
+                      <ul className="font-mono text-[9px] space-y-1 bg-black border border-primary/20 p-2">
+                        {preview.features.map((f: string, i: number) => (
+                          <li key={i} className="flex items-start gap-2 text-primary">
+                            <span className="opacity-50">+</span> <span className="text-foreground">{f}</span>
                           </li>
                         ))}
                       </ul>
@@ -283,21 +251,27 @@ export function AIEnhancementDialog({ product, onEnhancementComplete }: AIEnhanc
                   )}
 
                   {preview.suggestedDomain && (
-                    <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                      <Label className="text-xs font-medium text-blue-600">Suggested Domain</Label>
-                      <p className="text-sm mt-1 font-medium">{preview.suggestedDomain}</p>
+                    <div className="space-y-1">
+                      <Label className="font-mono text-[8px] uppercase text-primary/70">TLD_Route</Label>
+                      <p className="font-mono text-[10px] font-bold bg-black border border-primary/20 p-2 text-primary">{preview.suggestedDomain}</p>
                     </div>
                   )}
-
-                  <Button onClick={handleApply} className="w-full">
-                    Apply Enhancements
-                  </Button>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+
+        <div className="p-6 border-t border-border bg-black sticky bottom-0 flex gap-4 mt-auto">
+          <Button variant="outline" onClick={() => { setOpen(false); setPreview(null); }} className="flex-1 rounded-none font-mono uppercase h-14 cursor-pointer">
+            DISCONNECT
+          </Button>
+          <Button onClick={handleApply} disabled={!preview} className="flex-1 btn-brutal h-14 text-xs cursor-pointer">
+            COMMIT_MUTATION
+          </Button>
+        </div>
+      </SheetContent>
+    </Sheet>
   )
 }
+

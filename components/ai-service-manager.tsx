@@ -1,14 +1,19 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Card, CardContent } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Brain, Loader2, AlertCircle, CheckCircle } from "lucide-react"
+import { Brain, Loader2, AlertCircle, CheckCircle, Network, Key, Terminal } from "lucide-react"
 import type { AIServiceConfig } from "@/types/product"
 import { loadFromStorage, saveToStorage } from "@/lib/storage"
 
@@ -27,10 +32,10 @@ export function AIServiceManager({ open, onOpenChange, onConfigChange }: AIServi
   const [currentConfig, setCurrentConfig] = useState<AIServiceConfig | null>(null)
 
   const providers = [
-    { value: "openai", label: "OpenAI", description: "GPT models for general AI tasks" },
-    { value: "anthropic", label: "Anthropic", description: "Claude models for detailed analysis" },
-    { value: "groq", label: "Groq", description: "Fast inference with Llama models" },
-    { value: "gemini", label: "Google Gemini", description: "Google's multimodal AI" },
+    { value: "openai", label: "OPENAI", description: "GPT Models (Standard Compute)" },
+    { value: "anthropic", label: "ANTHROPIC", description: "Claude Models (Deep Analysis)" },
+    { value: "groq", label: "GROQ", description: "Llama Models (High Velocity Inference)" },
+    { value: "gemini", label: "GOOGLE GEMINI", description: "Gemini Models (Multimodal)" },
   ]
 
   // Load current configuration
@@ -38,13 +43,13 @@ export function AIServiceManager({ open, onOpenChange, onConfigChange }: AIServi
     if (open) {
       const savedServices = loadFromStorage<AIServiceConfig[]>("aiServices", [])
       const activeService = savedServices.find(service => service.enabled)
-      
+
       if (activeService) {
         setSelectedProvider(activeService.provider)
         setApiKey(activeService.apiKey)
         setCurrentConfig(activeService)
         setIsConnected(true)
-        setTestResult({ success: true, message: "Connected and ready" })
+        setTestResult({ success: true, message: "UPLINK ESTABLISHED. NODE READY." })
       } else {
         // Reset state when opening
         setSelectedProvider("openai")
@@ -58,22 +63,17 @@ export function AIServiceManager({ open, onOpenChange, onConfigChange }: AIServi
 
   const getApiKeyPlaceholder = (provider: string) => {
     switch (provider) {
-      case "openai":
-        return "sk-..."
-      case "anthropic":
-        return "sk-ant-..."
-      case "groq":
-        return "gsk_..."
-      case "gemini":
-        return "AI..."
-      default:
-        return "Enter API key"
+      case "openai": return "sk-..."
+      case "anthropic": return "sk-ant-..."
+      case "groq": return "gsk_..."
+      case "gemini": return "AI..."
+      default: return "INPUT_AUTH_TOKEN..."
     }
   }
 
   const testConnection = async () => {
     if (!apiKey.trim()) {
-      setTestResult({ success: false, message: "Please enter an API key" })
+      setTestResult({ success: false, message: "AUTH_TOKEN_MISSING" })
       return
     }
 
@@ -81,84 +81,25 @@ export function AIServiceManager({ open, onOpenChange, onConfigChange }: AIServi
     setTestResult(null)
 
     try {
-      let testEndpoint = ""
-      let testPayload = {}
-      let headers: Record<string, string> = {
-        "Content-Type": "application/json"
-      }
-
-      switch (selectedProvider) {
-        case "openai":
-          testEndpoint = "https://api.openai.com/v1/chat/completions"
-          headers["Authorization"] = `Bearer ${apiKey}`
-          testPayload = {
-            model: "gpt-3.5-turbo",
-            messages: [{ role: "user", content: "What is an apple?" }],
-            max_tokens: 50
-          }
-          break
-
-        case "anthropic":
-          testEndpoint = "https://api.anthropic.com/v1/messages"
-          headers["x-api-key"] = apiKey
-          headers["anthropic-version"] = "2023-06-01"
-          testPayload = {
-            model: "claude-3-haiku-20240307",
-            max_tokens: 50,
-            messages: [{ role: "user", content: "What is an apple?" }]
-          }
-          break
-
-        case "groq":
-          testEndpoint = "https://api.groq.com/openai/v1/chat/completions"
-          headers["Authorization"] = `Bearer ${apiKey}`
-          testPayload = {
-            model: "llama-3.1-8b-instant",
-            messages: [{ role: "user", content: "What is an apple?" }],
-            max_tokens: 50
-          }
-          break
-
-        case "gemini":
-          testEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`
-          testPayload = {
-            contents: [{ parts: [{ text: "What is an apple?" }] }]
-          }
-          break
-      }
-
-      const response = await fetch(testEndpoint, {
+      const response = await fetch("/api/ai/test", {
         method: "POST",
-        headers,
-        body: JSON.stringify(testPayload),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider: selectedProvider, apiKey: apiKey.trim() }),
       })
 
-      if (response.ok) {
-        setTestResult({ success: true, message: "Connection successful! API key is valid." })
+      const data = await response.json()
+
+      if (data.success) {
+        setTestResult({ success: true, message: "HANDSHAKE SUCCESSFUL. NODE VERIFIED." })
         setIsConnected(true)
       } else {
-        const errorData = await response.json().catch(() => ({}))
-        let errorMessage = "Connection failed"
-        
-        if (response.status === 401) {
-          errorMessage = "Invalid API key"
-        } else if (response.status === 429) {
-          errorMessage = "API quota exceeded or rate limit reached"
-        } else if (response.status === 403) {
-          errorMessage = "Access forbidden - check your API key permissions"
-        } else if (errorData.error?.message) {
-          errorMessage = errorData.error.message
-        } else {
-          errorMessage = `HTTP ${response.status}: ${response.statusText}`
-        }
-        
-        setTestResult({ success: false, message: errorMessage })
+        setTestResult({ success: false, message: data.error || "UPLINK_FAILED" })
         setIsConnected(false)
       }
     } catch (error) {
-      setTestResult({ 
-        success: false, 
-        message: `Network error: ${error instanceof Error ? error.message : "Unknown error"}` 
+      setTestResult({
+        success: false,
+        message: `ERR_NETWORK: ${error instanceof Error ? error.message : "UNKNOWN_FATAL_ERROR"}`
       })
       setIsConnected(false)
     } finally {
@@ -168,7 +109,7 @@ export function AIServiceManager({ open, onOpenChange, onConfigChange }: AIServi
 
   const saveConfiguration = () => {
     if (!isConnected) {
-      setTestResult({ success: false, message: "Please test the connection first" })
+      setTestResult({ success: false, message: "ERR: MUST_TEST_UPLINK_FIRST" })
       return
     }
 
@@ -189,20 +130,20 @@ export function AIServiceManager({ open, onOpenChange, onConfigChange }: AIServi
 
     saveToStorage("aiServices", allServices)
     setCurrentConfig(newConfig)
-    
+
     if (onConfigChange) {
       onConfigChange(allServices)
     }
 
-    setTestResult({ success: true, message: "Configuration saved successfully!" })
+    setTestResult({ success: true, message: "CONFIGURATION_LOCKED. SYSTEMS_NOMINAL." })
   }
 
   const getDefaultModel = (provider: string) => {
     switch (provider) {
-      case "openai": return "gpt-3.5-turbo"
+      case "openai": return "gpt-4o-mini"
       case "anthropic": return "claude-3-haiku-20240307"
       case "groq": return "llama-3.1-8b-instant"
-      case "gemini": return "gemini-pro"
+      case "gemini": return "gemini-2.0-flash"
       default: return ""
     }
   }
@@ -212,199 +153,140 @@ export function AIServiceManager({ open, onOpenChange, onConfigChange }: AIServi
     setIsConnected(false)
     setTestResult(null)
     setCurrentConfig(null)
-    
+
     // Clear all services
     saveToStorage("aiServices", [])
     if (onConfigChange) {
       onConfigChange([])
     }
   }
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Brain className="h-5 w-5" />
-            AI Service Configuration
-          </DialogTitle>
-        </DialogHeader>
 
-        <div className="space-y-6">
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full sm:max-w-md bg-card border-l border-border p-0 overflow-y-auto font-sans flex flex-col gap-0 duration-300">
+        <div className="p-6 border-b border-border bg-card z-20 sticky top-0 z-10">
+          <SheetHeader>
+            <SheetTitle className="font-display uppercase text-2xl tracking-tighter flex items-center gap-2">
+              <Network className="h-6 w-6 text-primary" />
+              Intelligence Core
+            </SheetTitle>
+            <SheetDescription className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+              Configure remote neural networking parameters.
+            </SheetDescription>
+          </SheetHeader>
+        </div>
+
+        <div className="p-6 flex-1 space-y-6">
           {/* Current Status */}
           {currentConfig && (
-            <Card className="border-primary/20 bg-primary/5 dark:bg-primary/10">
-              <CardContent className="pt-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-primary" />
-                    <span className="font-medium">
-                      Currently connected to{" "}
-                      {
-                        providers.find(
-                          (p) => p.value === currentConfig.provider
-                        )?.label
-                      }
-                    </span>
-                  </div>
-                  <Button variant="outline" size="sm" onClick={disconnect} className="cursor-pointer">
-                    Disconnect
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Provider Selection */}
-          <div className="space-y-2">
-            <Label>Choose AI Provider</Label>
-            <Select value={selectedProvider} onValueChange={setSelectedProvider} disabled={isConnected}>
-              <SelectTrigger className="cursor-pointer">
-                <SelectValue placeholder="Select AI provider" />
-              </SelectTrigger>
-              <SelectContent>
-                {providers.map((provider) => (
-                  <SelectItem key={provider.value} value={provider.value}>
-                    <div className="flex flex-col">
-                      <span>{provider.label}</span>
-                      <span className="text-xs text-muted-foreground">{provider.description}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* API Key Input */}
-          <div className="space-y-2">
-            <Label htmlFor="apiKey">API Key</Label>
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <Input
-                  id="apiKey"
-                  type="password"
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  placeholder={getApiKeyPlaceholder(selectedProvider)}
-                  disabled={isConnected}
-                />
-                {selectedProvider === "openai" && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Get your API key from{" "}
-                    <a
-                      href="https://platform.openai.com/api-keys"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary hover:underline"
-                    >
-                      OpenAI platform
-                    </a>
-                  </p>
-                )}
-                {selectedProvider === "anthropic" && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Get your API key from{" "}
-                    <a
-                      href="https://console.anthropic.com"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary hover:underline"
-                    >
-                      Anthropic console
-                    </a>
-                  </p>
-                )}
-                {selectedProvider === "groq" && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Get your API key from{" "}
-                    <a
-                      href="https://console.groq.com/keys"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary hover:underline"
-                    >
-                      Groq console
-                    </a>
-                  </p>
-                )}
-                {selectedProvider === "gemini" && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Get your API key from{" "}
-                    <a
-                      href="https://aistudio.google.com/app/apikey"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary hover:underline"
-                    >
-                      Google AI Studio
-                    </a>
-                  </p>
-                )}
+            <div className="border border-primary bg-primary/10 p-4 flex items-center justify-between">
+              <div className="flex items-center gap-2 font-mono text-xs uppercase text-primary">
+                <CheckCircle className="h-4 w-4" />
+                <span>LINK ACTIVE: {providers.find((p) => p.value === currentConfig.provider)?.label}</span>
               </div>
-              <Button 
-                onClick={testConnection} 
-                disabled={!apiKey.trim() || isTesting || isConnected}
-                variant="outline"
-                className="cursor-pointer"
-              >
-                {isTesting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Testing
-                  </>
-                ) : (
-                  "Test"
-                )}
+              <Button variant="outline" size="sm" onClick={disconnect} className="rounded-none h-8 font-mono text-[10px] border-primary text-primary hover:bg-primary hover:text-black">
+                SEVER LINK
               </Button>
             </div>
+          )}
+
+          <div className="space-y-6 border border-border p-6 bg-secondary/10">
+            {/* Provider Selection */}
+            <div className="space-y-3">
+              <Label className="font-mono text-xs uppercase text-muted-foreground">Core Provider</Label>
+              <Select value={selectedProvider} onValueChange={setSelectedProvider} disabled={isConnected}>
+                <SelectTrigger className="rounded-none border-border font-mono h-10">
+                  <SelectValue placeholder="SELECT_NODE" />
+                </SelectTrigger>
+                <SelectContent className="rounded-none border-border">
+                  {providers.map((provider) => (
+                    <SelectItem key={provider.value} value={provider.value} className="font-mono text-xs focus:bg-primary focus:text-black">
+                      <div className="flex flex-col text-left">
+                        <span>{provider.label}</span>
+                        <span className="text-[10px] opacity-70">{provider.description}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* API Key Input */}
+            <div className="space-y-3">
+              <Label htmlFor="apiKey" className="font-mono text-xs uppercase text-muted-foreground flex items-center gap-2">
+                <Key className="w-3 h-3" /> Auth Token
+              </Label>
+              <div className="flex gap-2">
+                <div className="flex-1 space-y-2">
+                  <Input
+                    id="apiKey"
+                    type="password"
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    placeholder={getApiKeyPlaceholder(selectedProvider)}
+                    disabled={isConnected}
+                    className="rounded-none border-border font-mono h-10"
+                  />
+                  {!isConnected && (
+                    <p className="text-[10px] font-mono text-muted-foreground uppercase flex items-center gap-1">
+                      <Terminal className="w-3 h-3" /> ACQUIRE KEY:{" "}
+                      {selectedProvider === "openai" && <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">PLATFORM.OPENAI.COM</a>}
+                      {selectedProvider === "anthropic" && <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">CONSOLE.ANTHROPIC.COM</a>}
+                      {selectedProvider === "groq" && <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">CONSOLE.GROQ.COM</a>}
+                      {selectedProvider === "gemini" && <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">AISTUDIO.GOOGLE.COM</a>}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Test Action inline */}
+            {!isConnected && (
+              <Button
+                onClick={testConnection}
+                disabled={!apiKey.trim() || isTesting}
+                variant="outline"
+                className="w-full rounded-none font-mono text-xs uppercase border-border h-10 hover:bg-white hover:text-black transition-colors"
+              >
+                {isTesting ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> INTERROGATING NODE</> : "PING SERVER (TEST LINK)"}
+              </Button>
+            )}
           </div>
 
           {/* Test Result */}
           {testResult && (
-            <Alert
-              className={
-                testResult.success
-                  ? "border-primary/20 bg-primary/5 dark:bg-primary/10"
-                  : "border-destructive/20 bg-destructive/5 dark:bg-destructive/10"
-              }
-            >
-              {testResult.success ? (
-                <CheckCircle className="h-4 w-4 text-primary" />
-              ) : (
-                <AlertCircle className="h-4 w-4 text-destructive" />
-              )}
-              <AlertDescription
-                className={
-                  testResult.success ? "text-primary" : "text-destructive"
-                }
-              >
+            <Alert className={`rounded-none border-l-4 p-4 ${testResult.success ? "border-l-primary border-primary/20 bg-primary/10" : "border-l-destructive border-destructive/20 bg-destructive/10"}`}>
+              {testResult.success ? <CheckCircle className="h-4 w-4 text-primary" /> : <AlertCircle className="h-4 w-4 text-destructive" />}
+              <AlertDescription className={`font-mono text-[10px] uppercase ml-2 ${testResult.success ? "text-primary" : "text-destructive"}`}>
                 {testResult.message}
               </AlertDescription>
             </Alert>
           )}
 
-          {/* Save Configuration */}
+          {/* Info Block */}
+          <div className="border border-border bg-black p-4 space-y-2 font-mono text-[10px] uppercase text-muted-foreground">
+            <p className="text-primary">SYSTEM DIRECTIVES:</p>
+            <ul className="space-y-1 ml-2 list-disc list-inside marker:text-primary">
+              <li>Select preferred compute engine.</li>
+              <li>Inject valid authentication token.</li>
+              <li>Ping server to verify handshake.</li>
+              <li>Commit configuration to memory block.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div className="p-6 border-t border-border bg-black sticky bottom-0 flex gap-4 mt-auto">
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="flex-1 rounded-none font-mono uppercase h-14">
+            Close Panel
+          </Button>
           {isConnected && !currentConfig && (
-            <Button onClick={saveConfiguration} className="w-full">
-              Save Configuration
+            <Button onClick={saveConfiguration} className="flex-1 btn-brutal h-14 text-xs">
+              <Brain className="w-5 h-5 mr-2" /> COMMIT LINK
             </Button>
           )}
-
-          {/* Info Card */}
-          <Card className="bg-secondary/50 border-secondary">
-            <CardContent className="pt-4">
-              <div className="space-y-2 text-sm">
-                <p className="font-medium">How it works:</p>
-                <ul className="space-y-1 text-muted-foreground">
-                  <li>• Choose your preferred AI provider</li>
-                  <li>• Enter your API key and test the connection</li>
-                  <li>• Once connected, the AI will enhance your scraped products</li>
-                  <li>• Only one provider can be active at a time</li>
-                </ul>
-              </div>
-            </CardContent>
-          </Card>
         </div>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   )
 }
+

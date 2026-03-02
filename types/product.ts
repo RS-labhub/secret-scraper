@@ -37,13 +37,15 @@ export interface Product {
   description: string
   domain?: Domain
   features: string[]
-  logoUrl?: string // URL to the product logo (especially for ProductHunt products)
+  tags?: string[]
+  logoUrl?: string
   links: {
     website?: string
     repository?: string
     productHunt?: string
     documentation?: string
     demo?: string
+    social?: string[]
   }
   source: "github" | "producthunt"
   metadata: {
@@ -97,7 +99,9 @@ export interface ScrapeRequest {
     phDay?: number
     phWeek?: number
     phFeatured?: boolean
+    phScrapeScope?: 'featured' | 'all' | 'both'
     scrapeMode?: 'leaderboard' | 'products'
+    deepScrape?: boolean
     topics?: string[]
     pageCount?: number
   }

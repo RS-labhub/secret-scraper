@@ -143,10 +143,7 @@ export class AnthropicProvider implements AIProvider {
         body: JSON.stringify({
           model: "claude-3-haiku-20240307",
           max_tokens: 500,
-          messages: [
-            {
-              role: "system",
-              content: `You are an AI assistant that enhances product information. Given a product, you can:
+          system: `You are an AI assistant that enhances product information. Given a product, you can:
 - Summarize: Create a concise, compelling 1-2 sentence summary
 - Highlights: Extract 2-3 key feature highlights (each MUST be exactly 7-10 words)
 - Domain: Suggest ONLY 1 most relevant domain from: AIE, Code, DevOps, DevSecOps, Product, Quality Assurance, Orchestration
@@ -154,8 +151,11 @@ export class AnthropicProvider implements AIProvider {
 CRITICAL: 
 - For highlights, each feature MUST be between 7-10 words. No more, no less.
 - For domain, respond with a single value using "suggestedDomain".
-
-Product: ${product.name}
+- Respond in JSON format only.`,
+          messages: [
+            {
+              role: "user",
+              content: `Product: ${product.name}
 Description: ${product.description}
 Current Domain: ${product.domain || "Unknown"}
 Current Features: ${product.features.join(", ")}
@@ -299,7 +299,7 @@ Please provide a JSON response with the requested enhancements. Remember: Each h
 
 export class GeminiProvider implements AIProvider {
   name = "Gemini"
-  models = ["gemini-1.5-flash", "gemini-1.5-pro"]
+  models = ["gemini-2.0-flash", "gemini-2.0-flash-lite"]
   requiresApiKey = false // Free option
 
   async enhance(request: AIEnhancementRequest, apiKey?: string): Promise<AIEnhancementResult> {
@@ -308,7 +308,7 @@ export class GeminiProvider implements AIProvider {
 
     try {
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${
           apiKey || process.env.GEMINI_API_KEY
         }`,
         {

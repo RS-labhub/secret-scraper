@@ -87,8 +87,10 @@ export async function POST(request: NextRequest) {
             day: timePeriod === "daily" ? day : undefined,
             week: timePeriod === "weekly" ? week : undefined,
             featured: filters?.phFeatured || false,
+            scrapeScope: filters?.phScrapeScope || 'both',
             apiKey: firecrawlApiKey,
             scrapeMode: filters?.scrapeMode || 'leaderboard',
+            deepScrape: filters?.deepScrape || false,
             topics: filters?.topics || [],
             pageCount: filters?.pageCount || 1,
           };

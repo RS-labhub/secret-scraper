@@ -30,45 +30,81 @@ export class ProductHuntScraper {
   }
 
   /**
-   * Scrape ProductHunt leaderboard for daily, weekly, or monthly periods
+   * Extract HTML content from a Firecrawl scrape response
+   */
+  private extractHtmlFromResponse(scrapeResult: any): string | null {
+    let htmlContent: string | null = null;
+    if (scrapeResult && typeof scrapeResult === 'object') {
+      const anyResult = scrapeResult as any;
+      if (anyResult.data && typeof anyResult.data === 'object' && anyResult.data.html) {
+        htmlContent = anyResult.data.html;
+      } else if (anyResult.html && typeof anyResult.html === 'string') {
+        htmlContent = anyResult.html;
+      } else if (anyResult.content && typeof anyResult.content === 'string') {
+        htmlContent = anyResult.content;
+      } else if (anyResult.data && typeof anyResult.data === 'string') {
+        htmlContent = anyResult.data;
+      }
+    } else if (typeof scrapeResult === 'string') {
+      htmlContent = scrapeResult;
+    }
+    return htmlContent;
+  }
+
+  /**
+   * Scrape ProductHunt leaderboard for daily, weekly, or monthly periods.
+   * Supports scraping featured only, all only, or both (merging results).
    */
   async scrapeLeaderboard(options: ProductHuntScrapingOptions): Promise<Product[]> {
-    const url = this.buildLeaderboardUrl(options);
-    try {
-      const scrapeResult = await this.firecrawl.scrape(url, { formats: ['html'] });
+    const scrapeScope = (options as any).scrapeScope || 'both';
 
-      // Extract HTML content from Firecrawl response
-      let htmlContent: string | null = null;
-      if (scrapeResult?.html) {
-  htmlContent = scrapeResult.html;
-      } else if ((scrapeResult as any)?.content) {
-  htmlContent = (scrapeResult as any).content;
-      } else if ((scrapeResult as any)?.data) {
-  htmlContent = (scrapeResult as any).data;
-      } else if (typeof scrapeResult === 'string') {
-  htmlContent = scrapeResult;
-      } else if (typeof scrapeResult === 'object' && scrapeResult && 'html' in scrapeResult) {
-  htmlContent = (scrapeResult as any).html;
-      } else {
-        throw new Error("No HTML content found in Firecrawl response");
+    const scrapeOne = async (url: string, label: string): Promise<Product[]> => {
+      try {
+        console.log(`🔍 Scraping ${label}: ${url}`);
+        const scrapeResult = await this.firecrawl.scrape(url, { formats: ['html'] });
+        const htmlContent = this.extractHtmlFromResponse(scrapeResult);
+
+        if (!htmlContent) {
+          console.error(`Firecrawl response format for ${label}:`, JSON.stringify(scrapeResult).substring(0, 200));
+          throw new Error(`HTML content is empty or not parsed properly from ${label} response`);
+        }
+
+        console.log(`Received ${label} HTML content, length: ${htmlContent.length}`);
+        const products = this.extractProductsFallback(htmlContent, options.period, label === 'featured');
+        console.log(`🎉 Found ${products.length} ${label} products`);
+        return products;
+      } catch (error) {
+        console.error(`Error scraping ProductHunt ${label}: ${error}`);
+        throw error;
       }
+    };
 
-      if (!htmlContent) {
-        throw new Error("HTML content is empty");
-      }
-
-      console.log(`Received HTML content, length: ${htmlContent.length}`);
-
-  // Parse HTML and extract products
-  // Use products page extraction for /products scraping
-  // For leaderboard, fallback to extractProductsFallback
-  const products = this.extractProductsFallback(htmlContent, options.period);
-  console.log(`🎉 Found ${products.length} products`);
-  return products;
-    } catch (error) {
-      console.error(`Error scraping ProductHunt: ${error}`);
-      throw error;
+    if (scrapeScope === 'featured') {
+      const featuredUrl = this.buildLeaderboardUrl({ ...options, featured: true });
+      return scrapeOne(featuredUrl, 'featured');
     }
+
+    if (scrapeScope === 'all') {
+      const allUrl = this.buildLeaderboardUrl({ ...options, featured: false });
+      return scrapeOne(allUrl, 'all');
+    }
+
+    // Default: 'both' - scrape featured and all, merge results
+    const featuredUrl = this.buildLeaderboardUrl({ ...options, featured: true });
+    const allUrl = this.buildLeaderboardUrl({ ...options, featured: false });
+
+    const [featuredProducts, allProducts] = await Promise.all([
+      scrapeOne(featuredUrl, 'featured'),
+      scrapeOne(allUrl, 'all'),
+    ]);
+
+    // Merge: featured products first, then all products that aren't already in featured
+    const featuredNames = new Set(featuredProducts.map(p => p.name.toLowerCase()));
+    const uniqueAllProducts = allProducts.filter(p => !featuredNames.has(p.name.toLowerCase()));
+
+    const merged = [...featuredProducts, ...uniqueAllProducts];
+    console.log(`📊 Merged: ${featuredProducts.length} featured + ${uniqueAllProducts.length} additional = ${merged.length} total`);
+    return merged;
   }
 
   /**
@@ -126,13 +162,8 @@ export class ProductHuntScraper {
         }
         try {
           const scrapeResult = await this.firecrawl.scrape(url, { formats: ['html'] });
-          let htmlContent: string | null = null;
-          if (scrapeResult?.html) htmlContent = scrapeResult.html;
-          else if ((scrapeResult as any)?.content) htmlContent = (scrapeResult as any).content;
-          else if ((scrapeResult as any)?.data) htmlContent = (scrapeResult as any).data;
-          else if (typeof scrapeResult === 'string') htmlContent = scrapeResult;
-          else if (typeof scrapeResult === 'object' && scrapeResult && 'html' in scrapeResult) htmlContent = (scrapeResult as any).html;
-          else throw new Error("No HTML content found in Firecrawl response");
+          const htmlContent = this.extractHtmlFromResponse(scrapeResult);
+          
           if (!htmlContent) throw new Error("HTML content is empty");
           console.log(`✅ Received HTML content for topic ${topic || 'best_rated'} page ${page}, length: ${htmlContent.length}`);
           // Robust extraction for /products page
@@ -176,11 +207,9 @@ export class ProductHuntScraper {
                   id: `ph-products-${Date.now()}-${index}`,
                   name: title,
                   description: description || `${title} - Product from ProductHunt`,
-                  domain: undefined,
                   features: [],
                   logoUrl,
                   links: {
-                    website: productUrl,
                     productHunt: productUrl
                   },
                   source: "producthunt",
@@ -243,20 +272,18 @@ export class ProductHuntScraper {
         id: `ph-${Date.now()}-${index}`,
         name: title,
         description: description || `${title} - Product from ProductHunt`,
-        domain: undefined, // Will be determined by AI enhancement
-        features: [], // Will be extracted during AI enhancement
+        features: [],
         logoUrl,
         links: {
-          website: productUrl || `https://www.producthunt.com/posts/${title.toLowerCase().replace(/\s+/g, '-')}`,
           productHunt: productUrl || `https://www.producthunt.com/posts/${title.toLowerCase().replace(/\s+/g, '-')}`
         },
         source: "producthunt" as const,
         metadata: {
           upvotes: votes,
-          upvotesToday: votes, // Assuming the votes are for the current period
+          upvotesToday: votes,
           scrapedAt: new Date().toISOString(),
           timePeriod: "daily" as const,
-          sourceIcon: logoUrl || "https://www.producthunt.com/favicon.ico", // Use product logo if available, fallback to PH favicon
+          sourceIcon: logoUrl || "https://www.producthunt.com/favicon.ico",
           sourceColor: "#da552f"
         },
         status: "pending" as const
@@ -271,7 +298,7 @@ export class ProductHuntScraper {
   /**
    * Fallback extraction method using simpler patterns
    */
-  private extractProductsFallback(htmlContent: string, period: string = 'daily'): Product[] {
+  private extractProductsFallback(htmlContent: string, period: string = 'daily', isFeatured: boolean = false): Product[] {
     const products: Product[] = [];
     try {
       const dom = new JSDOM(htmlContent);
@@ -281,12 +308,16 @@ export class ProductHuntScraper {
         try {
           // Index
           const index = idx + 1;
-          // Logo
+          // Logo - try img first, then video poster
           const logoImg = section.querySelector('img');
-          const logoUrl = logoImg?.getAttribute('src') || undefined;
+          let logoUrl = logoImg?.getAttribute('src') || undefined;
+          if (!logoUrl) {
+            const videoEl = section.querySelector('video');
+            logoUrl = videoEl?.getAttribute('poster') || undefined;
+          }
 
           // Title and product link
-          const titleDiv = section.querySelector('div[data-test^="post-name-"]');
+          const titleDiv = section.querySelector('[data-test^="post-name-"]');
           const titleLink = titleDiv?.querySelector('a');
           const title = titleLink?.textContent?.trim() || '';
           let productUrl = titleLink?.getAttribute('href') || '';
@@ -294,22 +325,32 @@ export class ProductHuntScraper {
             productUrl = `https://www.producthunt.com${productUrl}`;
           }
 
-          // Description
+          // Description - look for text-secondary span sibling
           let description: string | undefined = undefined;
           if (titleDiv) {
-            let nextDiv = titleDiv.nextElementSibling;
-            if (nextDiv) {
-              const classList = nextDiv.getAttribute('class') || '';
+            let nextSibling = titleDiv.nextElementSibling;
+            if (nextSibling) {
+              const classList = nextSibling.getAttribute('class') || '';
               const isSecondary = classList.includes('text-secondary');
-              const isLegacyText = nextDiv.getAttribute('data-sentry-component') === 'LegacyText';
+              const isLegacyText = nextSibling.getAttribute('data-sentry-component') === 'LegacyText';
               if (isSecondary || isLegacyText) {
-                description = nextDiv.textContent?.trim() || undefined;
+                description = nextSibling.textContent?.trim() || undefined;
               }
             }
           }
           if (!description) {
             description = `${title} - Product from ProductHunt`;
           }
+
+          // Extract tags/topics from links containing /topics/
+          const tags: string[] = [];
+          const topicLinks = Array.from(section.querySelectorAll('a[href*="/topics/"]'));
+          topicLinks.forEach(a => {
+            const tagText = a.textContent?.trim();
+            if (tagText && !tags.includes(tagText)) {
+              tags.push(tagText);
+            }
+          });
 
           // Upvotes
           let upvotes = 0;
@@ -324,16 +365,16 @@ export class ProductHuntScraper {
               id: `ph-leaderboard-${Date.now()}-${index}`,
               name: title,
               description,
-              domain: undefined,
               features: [],
+              tags: tags.length > 0 ? tags : undefined,
               logoUrl,
               links: {
-                website: productUrl,
                 productHunt: productUrl
               },
               source: "producthunt",
               metadata: {
                 upvotes,
+                trending: isFeatured,
                 scrapedAt: new Date().toISOString(),
                 timePeriod: period as "daily" | "weekly" | "monthly",
                 sourceIcon: logoUrl || "https://www.producthunt.com/favicon.ico",
@@ -351,6 +392,131 @@ export class ProductHuntScraper {
     }
     return products;
   }
+
+  /**
+   * Deep scrape a single ProductHunt product page to get website, GitHub repo, socials, and full description.
+   * Uses onlyMainContent: false to capture the Company Info and Social sidebar sections.
+   */
+  async enhanceProductData(product: Product): Promise<Product> {
+    const phUrl = product.links.productHunt;
+    if (!phUrl) return product;
+
+    // Derive the /products/ URL from the post URL if needed
+    let productPageUrl = phUrl;
+    if (phUrl.includes('/posts/')) {
+      productPageUrl = phUrl.replace('/posts/', '/products/');
+    }
+    
+    try {
+      console.log(`Deep scraping: ${productPageUrl}`);
+      
+      // Scrape with onlyMainContent: false to get Company Info & Social sections
+      const scrapeResult = await this.firecrawl.scrape(productPageUrl, {
+        formats: ['markdown', 'html'],
+        onlyMainContent: false,
+        waitFor: 3000,
+      });
+      const htmlContent = this.extractHtmlFromResponse(scrapeResult);
+      const markdown = (scrapeResult as any)?.markdown || '';
+
+      // --- 1. Extract website from HTML & description from markdown ---
+      if (htmlContent) {
+        const dom = new JSDOM(htmlContent);
+        const document = dom.window.document;
+
+        // Extract website from the "Visit website" button (data-test attribute)
+        const visitButton = document.querySelector('a[data-test="visit-website-button"]');
+        if (visitButton) {
+          const href = visitButton.getAttribute('href');
+          if (href) {
+            product.links.website = href.replace(/\?ref=producthunt$/, '');
+          }
+        }
+      }
+
+      // Extract description from markdown — it appears as a plain text line
+      // after the category links and before the navigation tabs (Overview, Reviews, etc.)
+      // Pattern: categories text, then the description, then "- [Overview]..."
+      if (markdown) {
+        // Look for text between the "Visit website" link area and the nav tabs
+        const descMatch = markdown.match(/\[Visit website\][^\n]*\n[\s\S]*?\n((?:[A-Z])[^\n]{40,500})\n/);
+        if (descMatch && descMatch[1]) {
+          const desc = descMatch[1].trim();
+          if (desc.length > (product.description?.length || 0) && !desc.includes('©') && !desc.startsWith('-') && !desc.startsWith('[')) {
+            product.description = desc;
+          }
+        }
+      }
+
+      // --- 2. Parse markdown for Company Info (GitHub) and Social sections ---
+      // These sections are only available with onlyMainContent: false
+      if (markdown) {
+        // Extract GitHub from Company Info section
+        // Markdown pattern: "Company Info\n[site.com](url) [GitHub](https://github.com/...)"
+        const companyInfoMatch = markdown.match(/Company Info[\s\S]*?(?=\w+ Info|Forum|Social|## )/i);
+        if (companyInfoMatch) {
+          const companySection = companyInfoMatch[0];
+          
+          // Find GitHub link
+          const githubMatch = companySection.match(/\[GitHub\]\((https?:\/\/github\.com\/[^\s)]+)\)/i);
+          if (githubMatch) {
+            product.links.repository = githubMatch[1].replace(/\?ref=producthunt$/, '');
+            console.log(`  Found GitHub: ${product.links.repository}`);
+          }
+
+          // Extract website from Company Info if not yet found
+          if (!product.links.website) {
+            const websiteMatch = companySection.match(/\[([^\]]+)\]\((https?:\/\/(?!github\.com)[^\s)]+)\)/i);
+            if (websiteMatch) {
+              product.links.website = websiteMatch[2].replace(/\?ref=producthunt$/, '');
+            }
+          }
+        }
+
+        // Extract social links from the "Social" section in the sidebar
+        // The section is a line like: "Social [X](https://x.com/handle) [LinkedIn](https://linkedin.com/...)"
+        // Must match "Social " followed by markdown links, NOT "Social & Community" or "Social Networking"
+        const socialMatch = markdown.match(/(?:^|\n)Social\s+(\[[^\]]+\]\(https?:\/\/[^\s)]+\)[\s\S]*?)(?:\n\n|\n##)/i);
+        if (socialMatch) {
+          const socialSection = socialMatch[0];
+          const socials: string[] = [];
+          
+          const linkRegex = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
+          let match;
+          while ((match = linkRegex.exec(socialSection)) !== null) {
+            const label = match[1];
+            const url = match[2].replace(/\?ref=producthunt$/, '');
+            
+            const socialDomains = ['x.com', 'twitter.com', 'linkedin.com', 'discord.gg', 'discord.com', 'facebook.com', 'instagram.com', 'youtube.com', 'tiktok.com', 'mastodon.', 'bsky.app', 'threads.net'];
+            const isSocialUrl = socialDomains.some(d => url.includes(d));
+            const isSocialLabel = ['x', 'twitter', 'linkedin', 'discord', 'facebook', 'instagram', 'youtube', 'tiktok', 'mastodon', 'bluesky', 'threads'].some(s => label.toLowerCase() === s || label.toLowerCase().includes(s));
+            
+            if ((isSocialUrl || isSocialLabel) && !url.includes('producthunt.com') && !socials.includes(url)) {
+              socials.push(url);
+              console.log(`  Found social: ${label} -> ${url}`);
+            }
+          }
+          
+          if (socials.length > 0) {
+            product.links.social = socials;
+          }
+        }
+
+        // Fallback: website from markdown "Visit website" link
+        if (!product.links.website) {
+          const visitMatch = markdown.match(/\[Visit website\]\((https?:\/\/[^\s)]+)\)/i);
+          if (visitMatch) {
+            product.links.website = visitMatch[1].replace(/\?ref=producthunt$/, '');
+          }
+        }
+      }
+
+      return product;
+    } catch (error) {
+      console.error(`Error deep scraping ${productPageUrl}:`, error);
+      return product; // fallback to original
+    }
+  }
 }
 
 /**
@@ -359,14 +525,34 @@ export class ProductHuntScraper {
 export async function scrapeProductHunt(options: ProductHuntScrapingOptions): Promise<Product[]> {
   try {
     const scraper = new ProductHuntScraper(options.apiKey);
+    let products: Product[] = [];
+    
     if ((options as any).scrapeMode === 'products') {
-      return await scraper.scrapeProductsPage({
+      products = await scraper.scrapeProductsPage({
         topics: (options as any).topics || [],
         pageCount: (options as any).pageCount || 1
       });
+    } else {
+      // Default to leaderboard
+      products = await scraper.scrapeLeaderboard(options);
     }
-    // Default to leaderboard
-    return await scraper.scrapeLeaderboard(options);
+    
+    // Apply Deep Scrape if enabled
+    if ((options as any).deepScrape && products.length > 0) {
+       console.log(`Starting deep scrape for ${products.length} ProductHunt items...`);
+       const batchSize = 3; // Keep small to avoid limit exhaustion
+       for (let i = 0; i < products.length; i += batchSize) {
+         const batch = products.slice(i, i + batchSize);
+         await Promise.all(batch.map(async (product) => {
+           await scraper.enhanceProductData(product);
+         }));
+         if (i + batchSize < products.length) {
+            await new Promise(resolve => setTimeout(resolve, 500)); // small delay to respect limits
+         }
+       }
+    }
+    
+    return products;
   } catch (error) {
     console.error(`ProductHunt scraping failed:`, error);
     throw error;

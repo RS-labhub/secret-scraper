@@ -494,7 +494,7 @@ export class GitHubScraper {
     try {
       // Use GitHub's public API to get more details
       const apiUrl = `https://api.github.com/repos/${repo.fullName}`
-      
+
       const response = await fetch(apiUrl, {
         headers: {
           'Accept': 'application/vnd.github.v3+json',
@@ -505,11 +505,11 @@ export class GitHubScraper {
 
       if (response.ok) {
         const data = await response.json()
-        
+
         if (data.description && !repo.description) {
-          console.log(`GitHub API data for ${repo.fullName}: stars=${data.stargazers_count}, language=${data.language}, website=${!!data.homepage}`)
+          console.log(`GitHub API data for ${repo.fullName}: stars=${data.stargazers_count}, language=${data.language}, website=${!!data.homepage}, forks=${data.forks_count}, license=${data.license?.name}`)
         }
-        
+
         const enhanced = {
           ...repo,
           description: data.description || repo.description || "No description available",
@@ -518,8 +518,10 @@ export class GitHubScraper {
           topics: data.topics?.length ? data.topics : repo.topics || [],
           website: data.homepage || undefined,
           features: [], // No features initially - will be added via AI enhancement
-        }
-        
+          forks: data.forks_count,
+          license: data.license?.name || undefined
+        } as TrendingRepo & { forks?: number; license?: string }
+
         console.log(`Enhanced ${repo.fullName} successfully`)
         return enhanced
       } else {
@@ -532,12 +534,12 @@ export class GitHubScraper {
     return repo
   }
 
-  private convertToProduct(repo: TrendingRepo, timePeriod: "daily" | "weekly" | "monthly"): Product {
+  private convertToProduct(repo: TrendingRepo & { forks?: number; license?: string }, timePeriod: "daily" | "weekly" | "monthly"): Product {
     const domain = this.classifyDomain(repo)
-    
+
     // Clean the repository name to remove any HTML artifacts
     const cleanName = repo.name.replace(/[<>\"']/g, '').replace(/\s+/g, ' ').trim()
-    
+
     const product: Product = {
       id: `github-${repo.fullName.replace(/[\/\s]/g, '-').toLowerCase()}`,
       name: cleanName,
@@ -560,14 +562,14 @@ export class GitHubScraper {
         trending: true,
         scrapedAt: new Date().toISOString(),
         timePeriod: timePeriod,
+        forks: repo.forks,
+        license: repo.license
       }
     }
-    
+
     // Return product without verbose logging
     return product
-  }
-
-  private classifyDomain(repo: TrendingRepo): Domain {
+  }  private classifyDomain(repo: TrendingRepo): Domain {
     const domains: Domain[] = []
     const name = repo.name.toLowerCase()
     const description = repo.description?.toLowerCase() || ""

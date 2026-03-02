@@ -1,14 +1,14 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect } from "react"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -17,10 +17,10 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Edit, X, Plus, Save, ExternalLink, Trash2, Github, Sparkles, Loader2, Undo2 } from "lucide-react"
+import { Edit, X, Plus, Save, ExternalLink, Trash2, Github, Sparkles, Loader2, Undo2, Search } from "lucide-react"
 import type { Product, AIServiceConfig, Domain } from "@/types/product"
 import { DOMAINS } from "@/types/product"
-import { loadFromStorage } from "@/lib/storage"
+import { loadFromStorage, storage } from "@/lib/storage"
 
 interface ProductEditorDialogProps {
   product: Product
@@ -29,73 +29,58 @@ interface ProductEditorDialogProps {
 
 export function ProductEditorDialog({ product, onProductUpdate }: ProductEditorDialogProps) {
   const [open, setOpen] = useState(false)
-  const [editedProduct, setEditedProduct] = useState<Product>({ 
-    ...product,
-  })
+  const [editedProduct, setEditedProduct] = useState<Product>({ ...product })
   const [newFeature, setNewFeature] = useState("")
+  const [newTag, setNewTag] = useState("")
   const [isEnhancing, setIsEnhancing] = useState(false)
+  const [isDeepScraping, setIsDeepScraping] = useState(false)
   const [enhancementError, setEnhancementError] = useState<string | null>(null)
   const [originalDescription, setOriginalDescription] = useState<string>("")
   const [aiDescription, setAiDescription] = useState<string>("")
   const [isShowingAi, setIsShowingAi] = useState(false)
 
-  // Update editedProduct when the product prop changes or when dialog opens
   useEffect(() => {
-    setEditedProduct({ 
-      ...product,
-    })
-    // Check if product already has AI enhanced description
+    setEditedProduct({ ...product })
     if (product.aiEnhanced?.summary) {
       setAiDescription(product.aiEnhanced.summary)
       setOriginalDescription(product.description)
       setIsShowingAi(product.description === product.aiEnhanced.summary)
     }
-  }, [product, open]) // Also trigger when dialog opens
+  }, [product, open])
 
   const handleSave = () => {
-    console.log('Saving product:', editedProduct)
     onProductUpdate(product.id, editedProduct)
     setOpen(false)
   }
 
   const addFeature = () => {
     if (newFeature.trim() && !editedProduct.features.includes(newFeature.trim())) {
-      setEditedProduct({
-        ...editedProduct,
-        features: [...editedProduct.features, newFeature.trim()],
-      })
+      setEditedProduct({ ...editedProduct, features: [...editedProduct.features, newFeature.trim()] })
       setNewFeature("")
     }
   }
 
   const removeFeature = (featureToRemove: string) => {
-    setEditedProduct({
-      ...editedProduct,
-      features: editedProduct.features.filter((feature) => feature !== featureToRemove),
-    })
+    setEditedProduct({ ...editedProduct, features: editedProduct.features.filter((feature) => feature !== featureToRemove) })
   }
 
-  const clearAllFeatures = () => {
-    setEditedProduct({
-      ...editedProduct,
-      features: [],
-    })
+  const addTag = () => {
+    if (newTag.trim() && !(editedProduct.tags || []).includes(newTag.trim())) {
+      setEditedProduct({ ...editedProduct, tags: [...(editedProduct.tags || []), newTag.trim()] })
+      setNewTag("")
+    }
+  }
+
+  const removeTag = (tagToRemove: string) => {
+    setEditedProduct({ ...editedProduct, tags: (editedProduct.tags || []).filter((tag) => tag !== tagToRemove) })
   }
 
   const handleToggleDescription = () => {
     if (isShowingAi && originalDescription) {
-      // Currently showing AI, switch to original
-      setEditedProduct({
-        ...editedProduct,
-        description: originalDescription,
-      })
+      setEditedProduct({ ...editedProduct, description: originalDescription })
       setIsShowingAi(false)
     } else if (!isShowingAi && aiDescription) {
-      // Currently showing original, switch to AI
-      setEditedProduct({
-        ...editedProduct,
-        description: aiDescription,
-      })
+      setEditedProduct({ ...editedProduct, description: aiDescription })
       setIsShowingAi(true)
     }
   }
@@ -103,32 +88,19 @@ export function ProductEditorDialog({ product, onProductUpdate }: ProductEditorD
   const handleEnhanceWithAI = async () => {
     setIsEnhancing(true)
     setEnhancementError(null)
-    
-    // Save original description before enhancement
     setOriginalDescription(editedProduct.description)
 
     try {
-      // Load AI service configuration
       const aiServices = loadFromStorage<AIServiceConfig[]>("aiServices", [])
       const enabledService = aiServices.find(s => s.enabled)
-      
-      if (!enabledService) {
-        throw new Error("No AI service configured. Please configure an AI service first.")
-      }
+      if (!enabledService) throw new Error("No AI service configured.")
 
       const response = await fetch("/api/ai/enhance", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           provider: enabledService.provider,
-          product: {
-            name: editedProduct.name,
-            description: editedProduct.description,
-            features: editedProduct.features,
-            domain: editedProduct.domain,
-          },
+          product: { name: editedProduct.name, description: editedProduct.description, features: editedProduct.features, domain: editedProduct.domain },
           tasks: ["summarize", "highlights", "domains"],
           apiKey: enabledService.apiKey,
         }),
@@ -142,7 +114,6 @@ export function ProductEditorDialog({ product, onProductUpdate }: ProductEditorD
       const result = await response.json()
       const enhancements = result.enhancements
 
-      // Save AI description and update product
       setAiDescription(enhancements.summary || editedProduct.description)
       setIsShowingAi(true)
       
@@ -150,399 +121,342 @@ export function ProductEditorDialog({ product, onProductUpdate }: ProductEditorD
         ...editedProduct,
         description: enhancements.summary || editedProduct.description,
         features: enhancements.highlights || editedProduct.features,
-        domain:
-          enhancements.suggestedDomain ||
-          (enhancements.suggestedDomains && enhancements.suggestedDomains.length > 0
-            ? enhancements.suggestedDomains[0]
-            : editedProduct.domain),
+        domain: enhancements.suggestedDomain || (enhancements.suggestedDomains && enhancements.suggestedDomains.length > 0 ? enhancements.suggestedDomains[0] : editedProduct.domain),
         aiEnhanced: {
           ...editedProduct.aiEnhanced,
           summary: enhancements.summary,
           originalLanguage: enhancements.originalLanguage,
           highlights: enhancements.highlights,
-          suggestedDomain:
-            enhancements.suggestedDomain ||
-            (enhancements.suggestedDomains && enhancements.suggestedDomains.length > 0
-              ? enhancements.suggestedDomains[0]
-              : editedProduct.aiEnhanced?.suggestedDomain),
+          suggestedDomain: enhancements.suggestedDomain || (enhancements.suggestedDomains && enhancements.suggestedDomains.length > 0 ? enhancements.suggestedDomains[0] : editedProduct.aiEnhanced?.suggestedDomain),
         },
       })
     } catch (error) {
-      console.error("Enhancement error:", error)
       setEnhancementError(error instanceof Error ? error.message : "Enhancement failed")
     } finally {
       setIsEnhancing(false)
     }
   }
 
+  const handleDeepScrape = async () => {
+    if (editedProduct.source !== 'producthunt' || !editedProduct.links.productHunt) return
+
+    setIsDeepScraping(true)
+    setEnhancementError(null)
+
+    try {
+      const firecrawlApiKey = storage.loadFirecrawlApiKey()
+      if (!firecrawlApiKey) throw new Error("Firecrawl API key not configured. Set it in the Scrape dialog first.")
+
+      const response = await fetch("/api/scrape/deep", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ products: [editedProduct], firecrawlApiKey }),
+      })
+
+      if (!response.ok) {
+        const err = await response.json()
+        throw new Error(err.error || "Deep scrape failed")
+      }
+
+      const result = await response.json()
+      if (result.products && result.products.length > 0) {
+        const enhanced = result.products[0]
+        setEditedProduct({
+          ...editedProduct,
+          description: enhanced.description || editedProduct.description,
+          links: { ...editedProduct.links, ...enhanced.links },
+        })
+      }
+    } catch (error) {
+      setEnhancementError(error instanceof Error ? error.message : "Deep scrape failed")
+    } finally {
+      setIsDeepScraping(false)
+    }
+  }
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm" variant="outline" className="text-xs px-2 py-1 bg-transparent">
-          <Edit className="w-3 h-3 mr-1" />
-          Edit
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <Button size="sm" variant="outline" className="rounded-none border-border font-mono text-xs uppercase h-8 hover:bg-secondary">
+          <Edit className="w-3 h-3 mr-1" /> Edit
         </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <DialogTitle className="font-serif font-bold">Edit Product</DialogTitle>
-              <DialogDescription>Customize product details, features, and preview the final card.</DialogDescription>
-            </div>
-            <Button 
-              onClick={handleEnhanceWithAI} 
-              disabled={isEnhancing}
-              className="flex items-center gap-2"
-              variant="outline"
-            >
-              {isEnhancing ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Enhancing...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4" />
-                  Enhance with AI
-                </>
-              )}
+      </SheetTrigger>
+      <SheetContent className="w-full sm:max-w-xl md:max-w-2xl bg-card border-l border-border p-0 overflow-y-auto font-sans flex flex-col gap-0 duration-300">
+        <div className="p-6 border-b border-border bg-card z-20 sticky top-0 z-10 flex justify-between items-start">
+          <SheetHeader>
+            <SheetTitle className="font-display uppercase text-2xl tracking-tighter">Edit Sequence</SheetTitle>
+            <SheetDescription className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Modify intelligence data manually or utilize AI augmentation.</SheetDescription>
+          </SheetHeader>
+          <div className="flex gap-2">
+            {editedProduct.source === 'producthunt' && (
+              <Button onClick={handleDeepScrape} disabled={isDeepScraping} variant="outline" className="rounded-none h-10 px-4 text-xs border-border">
+                {isDeepScraping ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Scraping...</> : <><Search className="w-4 h-4 mr-2" /> Deep Scrape</>}
+              </Button>
+            )}
+            <Button onClick={handleEnhanceWithAI} disabled={isEnhancing} className="btn-brutal h-10 px-4 text-xs">
+              {isEnhancing ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Enhancing...</> : <><Sparkles className="w-4 h-4 mr-2" /> Enhance with AI</>}
             </Button>
           </div>
-          {enhancementError && (
-            <div className="text-sm text-red-600 dark:text-red-400 mt-2">
-              {enhancementError}
-            </div>
-          )}
-        </DialogHeader>
+        </div>
 
-        <Tabs defaultValue="details" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="details">Details</TabsTrigger>
-            <TabsTrigger value="features">Features</TabsTrigger>
-            <TabsTrigger value="preview">Preview</TabsTrigger>
-          </TabsList>
+        <div className="p-6 flex-1 space-y-6">
+          {enhancementError && <div className="text-xs bg-destructive/10 text-destructive p-3 font-mono border border-destructive/20">{enhancementError}</div>}
+          
+          <Tabs defaultValue="details" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 bg-secondary rounded-none h-12 p-1">
+              <TabsTrigger value="details" className="rounded-none font-mono uppercase text-xs data-[state=active]:bg-background data-[state=active]:text-foreground">Core Details</TabsTrigger>
+              <TabsTrigger value="features" className="rounded-none font-mono uppercase text-xs data-[state=active]:bg-background data-[state=active]:text-foreground">Features Data</TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="details" className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Product Name</Label>
-                  <Input
-                    id="name"
-                    value={editedProduct.name}
-                    onChange={(e) => setEditedProduct({ ...editedProduct, name: e.target.value })}
-                  />
+            <div className="mt-6 border border-border p-6 bg-secondary/10">
+              <TabsContent value="details" className="space-y-6 m-0">
+                <div className="space-y-3">
+                  <Label className="font-mono text-xs uppercase text-muted-foreground">Entity Name</Label>
+                  <Input value={editedProduct.name} onChange={(e) => setEditedProduct({ ...editedProduct, name: e.target.value })} className="rounded-none border-border font-mono h-10" />
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <div className="relative">
-                    <Textarea
-                      id="description"
-                      rows={4}
-                      value={editedProduct.description}
-                      onChange={(e) => setEditedProduct({ ...editedProduct, description: e.target.value })}
-                      className="pr-12"
-                    />
+                
+                <div className="space-y-3">
+                  <Label className="font-mono text-xs uppercase text-muted-foreground flex justify-between">
+                    Description Plot
                     {(originalDescription && aiDescription) && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleToggleDescription}
-                        className="absolute top-2 right-2 h-8 w-8"
-                        title={isShowingAi ? "Switch to original description" : "Switch to AI description"}
-                      >
-                        <Undo2 className="h-4 w-4" />
-                      </Button>
+                      <span className="text-primary flex items-center gap-1 cursor-pointer" onClick={handleToggleDescription}>
+                        <Undo2 className="h-3 w-3" /> {isShowingAi ? "Revert to Original" : "Show AI Generated"}
+                      </span>
                     )}
-                  </div>
-                  {editedProduct.aiEnhanced?.originalLanguage && (
-                    <p className="text-xs text-muted-foreground">
-                      Original language: {editedProduct.aiEnhanced.originalLanguage}
-                    </p>
-                  )}
-                  {(originalDescription && aiDescription) && (
-                    <p className="text-xs text-muted-foreground">
-                      Currently showing: {isShowingAi ? "AI enhanced" : "Original"} description
-                    </p>
-                  )}
+                  </Label>
+                  <Textarea rows={6} value={editedProduct.description} onChange={(e) => setEditedProduct({ ...editedProduct, description: e.target.value })} className="rounded-none border-border font-mono resize-none" />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="domain">Domain</Label>
-                  <Select
-                    value={editedProduct.domain || ""}
-                    onValueChange={(value) =>
-                      setEditedProduct({
-                        ...editedProduct,
-                        domain: value as Domain,
-                      })
-                    }
-                  >
-                    <SelectTrigger id="domain">
+                {editedProduct.source !== 'producthunt' && (
+                <div className="space-y-3">
+                  <Label className="font-mono text-xs uppercase text-muted-foreground">Vector Domain</Label>
+                  <Select value={editedProduct.domain || ""} onValueChange={(value) => setEditedProduct({ ...editedProduct, domain: value as Domain })}>
+                    <SelectTrigger className="rounded-none border-border h-10 font-mono">
                       <SelectValue placeholder="Select a domain" />
                     </SelectTrigger>
-                    <SelectContent>
-                      {DOMAINS.map((domain) => (
-                        <SelectItem key={domain} value={domain}>
-                          {domain}
-                        </SelectItem>
-                      ))}
+                    <SelectContent className="rounded-none">
+                      {DOMAINS.map((domain) => <SelectItem key={domain} value={domain}>{domain}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                  {editedProduct.aiEnhanced?.suggestedDomain &&
-                    editedProduct.aiEnhanced.suggestedDomain !== editedProduct.domain && (
-                      <p className="text-xs text-muted-foreground">
-                        AI suggestion: {editedProduct.aiEnhanced.suggestedDomain}.{" "}
-                        <button
-                          type="button"
-                          className="text-primary underline"
-                          onClick={() =>
-                            setEditedProduct({
-                              ...editedProduct,
-                              domain: editedProduct.aiEnhanced?.suggestedDomain,
-                            })
-                          }
-                        >
-                          Apply suggestion
-                        </button>
-                      </p>
-                    )}
-                </div>
-
-              </div>
-
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Source Information</Label>
-                  <div className="p-3 bg-muted rounded-lg space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Source:</span>
-                      <Badge variant="outline" className="capitalize">
-                        {editedProduct.source}
-                      </Badge>
-                    </div>
-                    {editedProduct.links.repository && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">Repository:</span>
-                        <Button variant="ghost" size="sm" asChild>
-                          <a href={editedProduct.links.repository} target="_blank" rel="noopener noreferrer">
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
-                        </Button>
-                      </div>
-                    )}
-                    {editedProduct.metadata.stars && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">Stars:</span>
-                        <span className="text-sm">{editedProduct.metadata.stars}</span>
-                      </div>
-                    )}
-                    <div className="space-y-2 pt-2 border-t border-muted">
-                      <Label htmlFor="website" className="text-sm font-medium">Website URL</Label>
-                      <Input
-                        id="website"
-                        type="url"
-                        placeholder={editedProduct.links.repository || "https://example.com"}
-                        value={editedProduct.links.website || editedProduct.links.repository || ""}
-                        onChange={(e) =>
-                          setEditedProduct({
-                            ...editedProduct,
-                            links: { ...editedProduct.links, website: e.target.value },
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="features" className="space-y-4">
-            <div className="grid grid-cols-1 gap-6">
-              {/* Features */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label className="text-base font-medium">Features (Maximum 5)</Label>
-                    <p className="text-sm text-muted-foreground">Add key features for the product</p>
-                  </div>
-                  {editedProduct.features.length > 0 && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={clearAllFeatures}
-                      className="gap-2 text-destructive hover:text-destructive cursor-pointer"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                      Clear All
-                    </Button>
-                  )}
-                </div>
-
-                <div className="space-y-2 min-h-[60px] p-3 border rounded-lg">
-                  {editedProduct.features.map((feature, index) => (
-                    <div key={index} className="flex items-start gap-2 p-2 bg-muted rounded">
-                      <Input
-                        value={feature}
-                        onChange={(e) => {
-                          const updatedFeatures = [...editedProduct.features]
-                          updatedFeatures[index] = e.target.value
-                          setEditedProduct({
-                            ...editedProduct,
-                            features: updatedFeatures
-                          })
-                        }}
-                        className="flex-1 h-8 text-sm"
-                      />
-                      <X
-                        className="w-4 h-4 cursor-pointer text-muted-foreground hover:text-destructive mt-2"
-                        onClick={() => removeFeature(feature)}
-                      />
-                    </div>
-                  ))}
-                  {editedProduct.features.length === 0 && (
-                    <p className="text-sm text-muted-foreground text-center py-2">
-                      No features added yet. Add features manually or use AI enhancement.
+                  {editedProduct.aiEnhanced?.suggestedDomain && editedProduct.aiEnhanced.suggestedDomain !== editedProduct.domain && (
+                    <p className="text-[10px] font-mono text-muted-foreground">
+                      AI SUGGESTION: {editedProduct.aiEnhanced.suggestedDomain}. 
+                      <button type="button" className="text-primary underline ml-2" onClick={() => setEditedProduct({ ...editedProduct, domain: editedProduct.aiEnhanced?.suggestedDomain })}>APPLY</button>
                     </p>
                   )}
                 </div>
+                )}
 
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Add new feature..."
-                    value={newFeature}
-                    onChange={(e) => setNewFeature(e.target.value)}
-                    onKeyPress={(e) => e.key === "Enter" && addFeature()}
-                    disabled={editedProduct.features.length >= 5}
-                  />
-                  <Button onClick={addFeature} size="sm" disabled={editedProduct.features.length >= 5}>
-                    <Plus className="w-4 h-4" />
-                  </Button>
+                <div className="space-y-3 pt-4 border-t border-border">
+                  <Label className="font-mono text-xs uppercase text-muted-foreground">URL References</Label>
+                  
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Label className="font-mono text-[10px] uppercase w-24 text-muted-foreground">Website</Label>
+                      <Input type="url" placeholder="https://..." value={editedProduct.links?.website || ""} onChange={(e) => setEditedProduct({ ...editedProduct, links: { ...editedProduct.links, website: e.target.value } })} className="rounded-none border-border font-mono h-8 text-xs" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Label className="font-mono text-[10px] uppercase w-24 text-muted-foreground">Repository</Label>
+                      <Input type="url" placeholder="https://github.com/..." value={editedProduct.links?.repository || ""} onChange={(e) => setEditedProduct({ ...editedProduct, links: { ...editedProduct.links, repository: e.target.value } })} className="rounded-none border-border font-mono h-8 text-xs" />
+                    </div>
+                    {editedProduct.source !== 'github' && (
+                      <div className="flex items-center gap-2">
+                        <Label className="font-mono text-[10px] uppercase w-24 text-muted-foreground">Product Hunt</Label>
+                        <Input type="url" placeholder="https://producthunt.com/..." value={editedProduct.links?.productHunt || ""} onChange={(e) => setEditedProduct({ ...editedProduct, links: { ...editedProduct.links, productHunt: e.target.value } })} className="rounded-none border-border font-mono h-8 text-xs" />
+                      </div>
+                    )}
+                    {editedProduct.source !== 'github' && (
+                      <div className="space-y-2">
+                        <Label className="font-mono text-[10px] uppercase text-muted-foreground">Social Links</Label>
+                        <div className="space-y-1.5 mb-2">
+                          {(editedProduct.links?.social || []).map((url, index) => {
+                            const socialLabel = url.includes('x.com') ? 'X / Twitter' :
+                              url.includes('twitter.com') ? 'Twitter' :
+                              url.includes('linkedin.com') ? 'LinkedIn' :
+                              url.includes('discord.gg') || url.includes('discord.com') ? 'Discord' :
+                              url.includes('youtube.com') ? 'YouTube' :
+                              url.includes('facebook.com') ? 'Facebook' :
+                              url.includes('instagram.com') ? 'Instagram' :
+                              url.includes('tiktok.com') ? 'TikTok' :
+                              url.includes('bsky.app') ? 'Bluesky' :
+                              url.includes('threads.net') ? 'Threads' :
+                              url.includes('mastodon') ? 'Mastodon' :
+                              'Social';
+                            return (
+                              <div key={index} className="flex items-center gap-2 group">
+                                <span className="font-mono text-[10px] uppercase text-muted-foreground w-24 shrink-0">{socialLabel}</span>
+                                <span className="text-xs font-mono text-foreground truncate flex-1">{url}</span>
+                                <a
+                                  href={url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-muted-foreground hover:text-primary transition-colors shrink-0"
+                                  title={`Open ${socialLabel}`}
+                                >
+                                  <ExternalLink className="w-3.5 h-3.5" />
+                                </a>
+                                <button
+                                  type="button"
+                                  className="text-muted-foreground hover:text-destructive transition-colors shrink-0"
+                                  onClick={() => {
+                                    setEditedProduct({
+                                      ...editedProduct,
+                                      links: {
+                                        ...editedProduct.links,
+                                        social: (editedProduct.links?.social || []).filter((_, i) => i !== index)
+                                      }
+                                    });
+                                  }}
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            );
+                          })}
+                          {(!editedProduct.links?.social || editedProduct.links.social.length === 0) && (
+                            <span className="text-[10px] text-muted-foreground font-mono">No social links. Use Deep Scrape to discover them.</span>
+                          )}
+                        </div>
+                        <Input
+                          placeholder="Add social URL (e.g., https://x.com/handle)..."
+                          className="rounded-none border-border font-mono h-8 text-xs"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              const val = (e.target as HTMLInputElement).value.trim();
+                              if (val && val.startsWith('http')) {
+                                setEditedProduct({
+                                  ...editedProduct,
+                                  links: {
+                                    ...editedProduct.links,
+                                    social: [...(editedProduct.links?.social || []), val]
+                                  }
+                                });
+                                (e.target as HTMLInputElement).value = '';
+                              }
+                            }
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-3 pt-4 border-t border-border">
+                  <Label className="font-mono text-xs uppercase text-muted-foreground">Metadata</Label>
+                  <div className="grid grid-cols-2 gap-4">
+                    {editedProduct.source === "github" && (
+                      <>
+                        <div className="space-y-1">
+                          <Label className="font-mono text-[10px] uppercase text-muted-foreground">Language</Label>
+                          <Input value={editedProduct.metadata?.language || ""} onChange={(e) => setEditedProduct({ ...editedProduct, metadata: { ...editedProduct.metadata, language: e.target.value } })} className="rounded-none border-border font-mono h-8 text-xs" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="font-mono text-[10px] uppercase text-muted-foreground">License</Label>
+                          <Input value={editedProduct.metadata?.license || ""} onChange={(e) => setEditedProduct({ ...editedProduct, metadata: { ...editedProduct.metadata, license: e.target.value } })} className="rounded-none border-border font-mono h-8 text-xs" />
+                        </div>
+                      </>
+                    )}
+                    {editedProduct.source === "github" ? (
+                      <>
+                        <div className="space-y-1">
+                          <Label className="font-mono text-[10px] uppercase text-muted-foreground">Stars</Label>
+                          <Input type="number" value={editedProduct.metadata?.stars || 0} onChange={(e) => setEditedProduct({ ...editedProduct, metadata: { ...editedProduct.metadata, stars: Number(e.target.value) } })} className="rounded-none border-border font-mono h-8 text-xs" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="font-mono text-[10px] uppercase text-muted-foreground">Forks</Label>
+                          <Input type="number" value={editedProduct.metadata?.forks || 0} onChange={(e) => setEditedProduct({ ...editedProduct, metadata: { ...editedProduct.metadata, forks: Number(e.target.value) } })} className="rounded-none border-border font-mono h-8 text-xs" />
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="space-y-1">
+                          <Label className="font-mono text-[10px] uppercase text-muted-foreground">Upvotes</Label>
+                          <Input type="number" value={editedProduct.metadata?.upvotes || 0} onChange={(e) => setEditedProduct({ ...editedProduct, metadata: { ...editedProduct.metadata, upvotes: Number(e.target.value) } })} className="rounded-none border-border font-mono h-8 text-xs" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="font-mono text-[10px] uppercase text-muted-foreground">Source</Label>
+                          <Input value={editedProduct.source} onChange={(e) => setEditedProduct({ ...editedProduct, source: e.target.value as "github" | "producthunt" })} className="rounded-none border-border font-mono h-8 text-xs" />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="features" className="space-y-6 m-0">
+                <div className="space-y-3">
+                  <Label className="font-mono text-xs uppercase text-muted-foreground">Feature Array (Max 5)</Label>
+                  <div className="space-y-2 mb-4">
+                    {editedProduct.features.map((feature, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <Input value={feature} onChange={(e) => {
+                            const uf = [...editedProduct.features]; uf[index] = e.target.value;
+                            setEditedProduct({ ...editedProduct, features: uf })
+                          }} 
+                          className="rounded-none border-border font-mono h-10 flex-1" 
+                        />
+                        <Button variant="outline" className="rounded-none h-10 w-10 p-0 border-border text-muted-foreground" onClick={() => removeFeature(feature)}>
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <Input placeholder="Append feature..." value={newFeature} onChange={(e) => setNewFeature(e.target.value)} onKeyPress={(e) => e.key === "Enter" && addFeature()} disabled={editedProduct.features.length >= 5} className="rounded-none border-border font-mono h-10" />
+                    <Button onClick={addFeature} disabled={editedProduct.features.length >= 5} className="rounded-none h-10 px-4">
+                      ADD
+                    </Button>
+                  </div>
                 </div>
 
                 {editedProduct.aiEnhanced?.highlights && (
-                  <div>
-                    <Label className="text-sm font-medium text-primary">AI Suggested Features</Label>
-                    <div className="space-y-1 mt-2">
-                      {editedProduct.aiEnhanced.highlights
-                        .filter((highlight) => !editedProduct.features.includes(highlight))
-                        .map((highlight, index) => (
-                          <div
-                            key={index}
-                            className="text-sm p-2 bg-accent/5 border border-accent/20 rounded cursor-pointer hover:bg-accent/10"
-                            onClick={() => {
-                              setEditedProduct({
-                                ...editedProduct,
-                                features: [...editedProduct.features, highlight],
-                              })
-                            }}
-                          >
-                            + {highlight}
-                          </div>
-                        ))}
+                  <div className="space-y-3 pt-4 border-t border-border">
+                    <Label className="font-mono text-xs uppercase text-primary">AI Suggestions</Label>
+                    <div className="space-y-2">
+                      {editedProduct.aiEnhanced.highlights.filter(h => !editedProduct.features.includes(h)).map((h, i) => (
+                        <div key={i} className="text-xs font-mono p-3 border border-primary/30 bg-primary/5 cursor-pointer hover:bg-primary/20 transition-colors" onClick={() => setEditedProduct({ ...editedProduct, features: [...editedProduct.features, h] })}>
+                          + {h}
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
-              </div>
-            </div>
-          </TabsContent>
 
-          <TabsContent value="preview" className="space-y-4">
-            <div>
-              <Label className="text-base font-medium">Card Preview</Label>
-              <p className="text-sm text-muted-foreground">Preview how your product card will appear</p>
-            </div>
-
-            <div className="max-w-md mx-auto">
-              <Card className="hover:shadow-lg transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                        editedProduct.source === "github" 
-                          ? "bg-gradient-to-br from-gray-700 to-gray-900" 
-                          : editedProduct.metadata.sourceIcon 
-                            ? "bg-transparent" 
-                            : "bg-gradient-to-br from-orange-500 to-red-600"
-                      }`}>
-                        {editedProduct.source === "github" ? (
-                          <Github className="w-7 h-7 text-white" />
-                        ) : editedProduct.metadata.sourceIcon ? (
-                          <img 
-                            src={editedProduct.metadata.sourceIcon} 
-                            alt="Product Hunt" 
-                            className="w-full h-full object-cover rounded-lg"
-                          />
-                        ) : (
-                          <div className="w-5 h-5 text-white font-bold flex items-center justify-center">
-                            🚀
-                          </div>
-                        )}
-                      </div>
-                      <div>
-                        <CardTitle className="text-base font-serif font-bold">{editedProduct.name}</CardTitle>
-                        <CardDescription className="text-sm capitalize">{editedProduct.source}</CardDescription>
-                      </div>
+                {editedProduct.source === 'producthunt' && (
+                  <div className="space-y-3 pt-4 border-t border-border">
+                    <Label className="font-mono text-xs uppercase text-muted-foreground">Tags / Topics</Label>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {(editedProduct.tags || []).map((tag, index) => (
+                        <Badge key={index} variant="outline" className="rounded-none border-border font-mono text-xs cursor-pointer hover:bg-destructive/20 hover:border-destructive/50 transition-colors" onClick={() => removeTag(tag)}>
+                          {tag} <X className="w-3 h-3 ml-1" />
+                        </Badge>
+                      ))}
+                      {(!editedProduct.tags || editedProduct.tags.length === 0) && (
+                        <span className="text-xs text-muted-foreground font-mono">No tags added yet.</span>
+                      )}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Badge className="bg-muted text-muted-foreground">{editedProduct.status}</Badge>
+                    <div className="flex gap-2">
+                      <Input placeholder="Add tag..." value={newTag} onChange={(e) => setNewTag(e.target.value)} onKeyPress={(e) => e.key === "Enter" && addTag()} className="rounded-none border-border font-mono h-10" />
+                      <Button onClick={addTag} className="rounded-none h-10 px-4">
+                        ADD
+                      </Button>
                     </div>
                   </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-                    {editedProduct.description}
-                  </p>
-
-                  {editedProduct.domain && (
-                    <div className="mb-4">
-                      <div className="text-xs font-medium text-muted-foreground mb-1">Domain</div>
-                      <Badge variant="secondary" className="text-xs">
-                        {editedProduct.domain}
-                      </Badge>
-                    </div>
-                  )}
-
-                  {editedProduct.features && editedProduct.features.length > 0 && (
-                    <div className="mb-4">
-                      <div className="text-xs font-medium text-primary mb-2">Key Features</div>
-                      <ul className="text-xs text-muted-foreground space-y-1">
-                        {editedProduct.features.slice(0, 3).map((feature, index) => (
-                          <li key={index} className="flex items-start gap-2">
-                            <span className="text-accent">•</span>
-                            {feature}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between">
-                    <div className="text-xs text-muted-foreground">
-                      {editedProduct.metadata.stars && `⭐ ${editedProduct.metadata.stars}`}
-                      {editedProduct.metadata.rating && `⭐ ${editedProduct.metadata.rating}`}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                )}
+              </TabsContent>
             </div>
-          </TabsContent>
-        </Tabs>
+          </Tabs>
+        </div>
 
-        <div className="flex justify-end gap-2 pt-4 border-t">
-          <Button variant="outline" onClick={() => setOpen(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave}>
-            <Save className="w-4 h-4 mr-2" />
-            Save Changes
+        <div className="p-6 border-t border-border bg-black sticky bottom-0 flex gap-4">
+          <Button variant="outline" className="flex-1 rounded-none font-mono uppercase h-14" onClick={() => setOpen(false)}>Cancel</Button>
+          <Button className="flex-1 btn-brutal h-14" onClick={handleSave}>
+            <Save className="w-5 h-5 mr-2" /> Commit Changes
           </Button>
         </div>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   )
 }
+

@@ -1,18 +1,17 @@
-"use client"
+﻿"use client"
 
 import { useState } from "react"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Loader2, Upload, CheckCircle, XCircle, ExternalLink } from "lucide-react"
+import { Loader2, Upload, CheckCircle, XCircle, ExternalLink, Network } from "lucide-react"
 import type { Product } from "@/types/product"
 
 interface PublishDialogProps {
@@ -70,157 +69,136 @@ export function PublishDialog({ products, cmsConfig, onPublishComplete }: Publis
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button disabled={approvedProducts.length === 0 || !cmsConfig} className="cursor-pointer">
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <Button disabled={approvedProducts.length === 0 || !cmsConfig} variant="outline" className="rounded-none border-border font-mono text-xs uppercase h-10 hover:bg-secondary">
           <Upload className="w-4 h-4 mr-2" />
-          Publish to CMS ({approvedProducts.length})
+          SYNC DEPLOY [{approvedProducts.length}]
         </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="font-serif font-bold">Publish to CMS</DialogTitle>
-          <DialogDescription>
-            Publish {approvedProducts.length} approved products to your CMS.
-            {!cmsConfig && " Please configure CMS settings first."}
-          </DialogDescription>
-        </DialogHeader>
+      </SheetTrigger>
+      <SheetContent className="w-full sm:max-w-md bg-card border-l border-border p-0 overflow-y-auto font-sans flex flex-col gap-0 duration-300">
+        <div className="p-6 border-b border-border bg-card z-20 sticky top-0 z-10">
+          <SheetHeader>
+            <SheetTitle className="font-display uppercase text-2xl tracking-tighter flex items-center gap-2">
+              <Network className="h-6 w-6 text-primary" />
+              Deployment Net
+            </SheetTitle>
+            <SheetDescription className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+              Push {approvedProducts.length} verified packages to {cmsConfig?.provider || 'NULL'}.
+            </SheetDescription>
+          </SheetHeader>
+        </div>
 
-        {!cmsConfig ? (
-          <div className="text-center py-8">
-            <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-              <Upload className="w-8 h-8 text-muted-foreground" />
+        <div className="p-6 flex-1 space-y-6">
+          {!cmsConfig ? (
+            <div className="border border-destructive bg-destructive/10 p-6 text-center space-y-4">
+              <Upload className="w-8 h-8 text-destructive mx-auto" />
+              <h3 className="font-mono text-sm uppercase text-destructive font-bold">ROUTE_UNAVAILABLE</h3>
+              <p className="font-mono text-[10px] text-destructive/80 uppercase">Define CMS uplink configuration matrix before initializing broadcast.</p>
             </div>
-            <h3 className="font-serif font-bold text-lg mb-2">CMS Not Configured</h3>
-            <p className="text-muted-foreground mb-4">Configure your CMS integration to publish products</p>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {/* CMS Info */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Publishing Destination</CardTitle>
-                <CardDescription>Products will be published to your configured CMS</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Badge variant="secondary">{cmsConfig.provider}</Badge>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {approvedProducts.length} approved products ready to publish
-                    </p>
-                  </div>
+          ) : (
+            <div className="space-y-6">
+              {/* CMS Info */}
+              <div className="border border-primary/30 bg-primary/5 p-4 space-y-2">
+                <div className="font-mono text-xs text-primary uppercase border-b border-primary/30 pb-2">Target Node</div>
+                <div className="flex items-center justify-between pt-2">
+                  <Badge variant="outline" className="rounded-none border-primary text-primary font-mono text-[10px] bg-black">SYS_{cmsConfig.provider.toUpperCase()}</Badge>
+                  <span className="font-mono text-[10px] text-muted-foreground">READY_COUNT: {approvedProducts.length}</span>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
 
-            {/* Products to Publish */}
-            <div className="space-y-3">
-              <h4 className="font-medium">Products to Publish</h4>
-              <div className="max-h-60 overflow-y-auto space-y-2">
-                {approvedProducts.slice(0, 10).map((product) => (
-                  <div key={product.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                    <div>
-                      <p className="font-medium text-sm">{product.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {product.source}
-                        {product.domain && ` • ${product.domain}`}
+              {/* Products to Publish */}
+              <div className="border border-border p-4 bg-background">
+                <h4 className="font-mono text-xs text-primary uppercase pb-3 border-b border-border">Manifest Sequence</h4>
+                <div className="max-h-60 overflow-y-auto space-y-2 pt-3 pr-2">
+                  {approvedProducts.slice(0, 10).map((product) => (
+                    <div key={product.id} className="flex flex-col p-2 bg-secondary/20 border border-border/50">
+                      <div className="flex justify-between items-center">
+                        <p className="font-mono text-xs text-foreground truncate max-w-[200px]">{product.name}</p>
+                        <Badge variant="outline" className="rounded-none border-border text-[9px] uppercase px-1 py-0">{product.status}</Badge>
+                      </div>
+                      <p className="font-mono text-[9px] text-muted-foreground mt-1 truncate">
+                        SRC:{product.source} {product.domain && `| DOM:${product.domain}`}
                       </p>
                     </div>
-                    <Badge variant="outline" className="text-xs">
-                      {product.status}
-                    </Badge>
-                  </div>
-                ))}
-                {approvedProducts.length > 10 && (
-                  <p className="text-sm text-muted-foreground text-center">
-                    ...and {approvedProducts.length - 10} more products
-                  </p>
-                )}
+                  ))}
+                  {approvedProducts.length > 10 && (
+                    <div className="p-2 text-[10px] font-mono text-center text-muted-foreground uppercase bg-secondary/10 border border-dashed border-border/50">
+                      + {approvedProducts.length - 10} OVERFLOW PACKAGES
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
 
-            {/* Publishing Results */}
-            {results && (
-              <Card className={results.success ? "border-secondary/20" : "border-destructive/20"}>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    {results.success ? (
-                      <CheckCircle className="w-5 h-5 text-secondary" />
-                    ) : (
-                      <XCircle className="w-5 h-5 text-destructive" />
-                    )}
-                    Publishing {results.success ? "Complete" : "Failed"}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
+              {/* Publishing Results */}
+              {results && (
+                <div className={`border p-4 ${results.success ? 'border-primary bg-primary/5' : 'border-destructive bg-destructive/5'}`}>
+                  <div className="font-mono text-xs uppercase pb-3 border-b border-border mb-3 flex items-center gap-2">
+                    {results.success ? <CheckCircle className="w-4 h-4 text-primary" /> : <XCircle className="w-4 h-4 text-destructive" />}
+                    <span className={results.success ? "text-primary" : "text-destructive"}>
+                      TRANSMISSION {results.success ? "COMPLETE" : "HALTED"}
+                    </span>
+                  </div>
+                  
                   {results.success ? (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm">Successfully published:</span>
-                        <Badge variant="secondary">{results.published} products</Badge>
+                    <div className="space-y-4">
+                      <div className="flex justify-between font-mono text-[10px] uppercase">
+                        <span className="text-muted-foreground">VECTORS DELIVERED:</span>
+                        <span className="text-primary font-bold">{results.published}</span>
                       </div>
                       {results.failed > 0 && (
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm">Failed to publish:</span>
-                          <Badge variant="destructive">{results.failed} products</Badge>
+                        <div className="flex justify-between font-mono text-[10px] uppercase">
+                          <span className="text-muted-foreground">VECTORS DROPPED:</span>
+                          <span className="text-destructive font-bold">{results.failed}</span>
                         </div>
                       )}
                     </div>
                   ) : (
-                    <p className="text-sm text-destructive">{results.error}</p>
+                    <p className="font-mono text-xs text-destructive uppercase">{results.error}</p>
                   )}
 
                   {/* Individual Results */}
                   {results.results && (
-                    <div className="mt-4 space-y-2 max-h-40 overflow-y-auto">
+                    <div className="mt-4 space-y-1 max-h-40 overflow-y-auto border-t border-border pt-3 pr-2">
                       {results.results.map((result: any, index: number) => (
-                        <div
-                          key={index}
-                          className={`flex items-center justify-between p-2 rounded text-xs ${
-                            result.success ? "bg-secondary/10" : "bg-destructive/10"
-                          }`}
-                        >
-                          <span>{result.productName}</span>
-                          <div className="flex items-center gap-2">
+                        <div key={index} className={`flex items-center justify-between p-2 font-mono text-[10px] border ${result.success ? 'border-primary/20 bg-primary/10 text-primary' : 'border-destructive/20 bg-destructive/10 text-destructive'}`}>
+                          <span className="truncate max-w-[200px]">{result.productName}</span>
+                          <div className="flex items-center gap-2 shrink-0">
                             {result.success ? (
                               <>
-                                <CheckCircle className="w-3 h-3 text-secondary" />
+                                <CheckCircle className="w-3 h-3" />
                                 {result.url && (
-                                  <Button variant="ghost" size="sm" asChild className="h-auto p-0">
-                                    <a href={result.url} target="_blank" rel="noopener noreferrer">
-                                      <ExternalLink className="w-3 h-3" />
-                                    </a>
-                                  </Button>
+                                  <a href={result.url} target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">
+                                    <ExternalLink className="w-3 h-3" />
+                                  </a>
                                 )}
                               </>
                             ) : (
-                              <XCircle className="w-3 h-3 text-destructive" />
+                              <XCircle className="w-3 h-3" />
                             )}
                           </div>
                         </div>
                       ))}
                     </div>
                   )}
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Actions */}
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setOpen(false)}>
-                {results ? "Close" : "Cancel"}
-              </Button>
-              {!results && (
-                <Button onClick={handlePublish} disabled={publishing}>
-                  {publishing && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  {publishing ? "Publishing..." : `Publish ${approvedProducts.length} Products`}
-                </Button>
+                </div>
               )}
             </div>
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
+          )}
+        </div>
+
+        <div className="p-6 border-t border-border bg-black sticky bottom-0 flex gap-4 mt-auto">
+          <Button variant="outline" onClick={() => setOpen(false)} className="flex-1 rounded-none font-mono uppercase h-14">
+            {results ? "CLOSE CHANNEL" : "ABORT"}
+          </Button>
+          {!results && cmsConfig && (
+            <Button onClick={handlePublish} disabled={publishing} className="flex-1 btn-brutal h-14 text-xs">
+              {publishing ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> UPLOADING...</> : <><Upload className="w-4 h-4 mr-2" /> EXECUTE SYNC</>}
+            </Button>
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
   )
 }
+

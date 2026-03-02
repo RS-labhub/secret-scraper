@@ -21,10 +21,11 @@ export class ProductExporter {
         id: product.id,
         name: product.name,
         description: product.description,
-        logoUrl: product.logoUrl, // Add logo URL for ProductHunt products
+        logoUrl: product.logoUrl, // Add logo URL for ProductHunt products 
         websiteUrl: product.links?.website,
         repositoryUrl: product.links?.repository,
         productHuntUrl: product.links?.productHunt,
+        socialHandles: product.links?.social,
         documentationUrl: product.links?.documentation,
         demoUrl: product.links?.demo,
         stars: product.metadata?.stars,
@@ -37,6 +38,7 @@ export class ProductExporter {
           ? { domain: product.domains[0] }
           : {}),
         ...(product.features && product.features.length > 0 ? { features: product.features } : {}),
+        ...(product.tags && product.tags.length > 0 ? { tags: product.tags } : {}),
         source: product.source,
         scrapedAt: product.metadata?.scrapedAt,
       })),
@@ -45,31 +47,56 @@ export class ProductExporter {
     return JSON.stringify(exportData, null, 2)
   }
 
-  static exportToCSV(products: any[], options: ExportOptions = { format: "csv" }) {
-  const headers = ["ID", "Name", "Description", "Logo URL", "Website URL", "Repository URL", "Product Hunt URL", "Stars", "Upvotes", "Language", "Domain", "Features", "Source", "Scraped At"]
+  static exportToCSV(products: any[], options: ExportOptions & { customSchemaFields?: string[] } = { format: "csv" }) {
+    if (products.length === 0) return "";
 
-    const csvRows = [headers.join(",")]
+    // If a custom schema was used, dynamically generate headers
+    const useDynamicHeaders = options.customSchemaFields || (products[0] && !('links' in products[0]) && !('metadata' in products[0]));
+    
+    let headers: string[] = [];
+    if (useDynamicHeaders && products[0]) {
+      headers = Object.keys(products[0]);
+    } else {
+      headers = ["ID", "Name", "Description", "Logo URL", "Website URL", "Repository URL", "Product Hunt URL", "Social Handles", "Stars", "Upvotes", "Language", "Domain", "Features", "Tags", "Source", "Scraped At"];
+    }
+
+    const csvRows = [headers.join(",")];
 
     products.forEach((product) => {
-      const row = [
-        product.id,
-        `"${product.name?.replace(/"/g, '""') || ""}"`,
-        `"${product.description?.replace(/"/g, '""') || ""}"`,
-        product.logoUrl || "",
-        product.links?.website || "",
-        product.links?.repository || "",
-        product.links?.productHunt || "",
-        product.metadata?.stars || "",
-        product.metadata?.upvotes || "",
-        product.metadata?.language || "",
-        `"${product.domains?.[0] || ""}"`,
-        `"${product.features?.join("; ") || ""}"`,
-        product.source || "",
-        product.metadata?.scrapedAt || "",
-      ]
-
-      csvRows.push(row.join(","))
-    })
+      if (useDynamicHeaders) {
+        const row = headers.map(header => {
+          const value = product[header];
+          if (Array.isArray(value)) {
+            return `"${value.join('; ')}"`;
+          }
+          if (typeof value === 'object' && value !== null) {
+            return `"${JSON.stringify(value).replace(/"/g, '""')}"`;
+          }
+          return `"${String(value || '').replace(/"/g, '""')}"`;
+        });
+        csvRows.push(row.join(","));
+      } else {
+        const row = [
+          product.id,
+          `"${product.name?.replace(/"/g, '""') || ""}"`,
+          `"${product.description?.replace(/"/g, '""') || ""}"`,
+          product.logoUrl || "",
+          product.links?.website || "",
+          product.links?.repository || "",
+          product.links?.productHunt || "",
+          `"${product.links?.social?.join("; ") || ""}"`,
+          product.metadata?.stars || "",
+          product.metadata?.upvotes || "",
+          product.metadata?.language || "",
+          `"${product.domain || ""}"`,
+          `"${product.features?.join("; ") || ""}"`,
+          `"${product.tags?.join("; ") || ""}"`,
+          product.source || "",
+          product.metadata?.scrapedAt || "",
+        ];
+        csvRows.push(row.join(","));
+      }
+    });
 
     return csvRows.join("\n")
   }
@@ -97,6 +124,13 @@ export class ProductExporter {
       xml += `      <productHunt>${product.links?.productHunt || ""}</productHunt>\n`
       xml += `      <documentation>${product.links?.documentation || ""}</documentation>\n`
       xml += `      <demo>${product.links?.demo || ""}</demo>\n`
+      if (product.links?.social && product.links.social.length > 0) {
+        xml += `      <socials>\n`
+        product.links.social.forEach((s: string) => {
+          xml += `        <social><![CDATA[${s}]]></social>\n`
+        })
+        xml += `      </socials>\n`
+      }
       xml += `    </links>\n`
       xml += `    <metadata>\n`
       xml += `      <stars>${product.metadata?.stars || ""}</stars>\n`
@@ -185,6 +219,12 @@ export class ProductExporter {
         }
         if (product.links.productHunt) {
           markdown += `- [Product Hunt](${product.links.productHunt})\n`
+        }
+        if (product.links.social && product.links.social.length > 0) {
+          markdown += `- **Socials**:\n`
+          product.links.social.forEach((s: string) => {
+            markdown += `  - [${new URL(s).hostname}](${s})\n`
+          })
         }
         if (product.links.documentation) {
           markdown += `- [Documentation](${product.links.documentation})\n`
